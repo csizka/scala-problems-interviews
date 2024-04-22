@@ -12,6 +12,8 @@ sealed abstract class RList[+T] {
   def apply(index: Int): T
   def length: Int
   def reverse: RList[T]
+  def ++[S >: T](lst: RList[S]): RList[S]
+  def removeNthElem(index: Int): RList[T]
 }
 
 case object RNil extends RList[Nothing] {
@@ -23,8 +25,9 @@ case object RNil extends RList[Nothing] {
   override def toString: String = "[]"
   override def apply(index: Int): Nothing = throw new NoSuchElementException
   override def length: Int = 0
-
   override def reverse: RList[Nothing] = RNil
+  override def ++[S >: Nothing](lst: RList[S]): RList[S] = lst
+  override def removeNthElem(index: Int): RList[Nothing] = RNil
 }
 case class ::[+T](override val head: T, override val tail: RList[T]) extends RList[T] {
   override def isEmpty: Boolean = false
@@ -59,14 +62,32 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     lengthHelper(this, 0)
   }
-
   override def reverse: RList[T] = {
     @tailrec
-    def reverseHelper(rest: RList[T], result: RList[T]): RList[T] = rest match {
-      case RNil => result
-      case ::(head, tail) => reverseHelper(tail, head :: result)
+    def reverseHelper(rest: RList[T], acc: RList[T]): RList[T] = rest match {
+      case RNil => acc
+      case ::(head, tail) => reverseHelper(tail, head :: acc)
     }
-    reverseHelper(this, RNil).reverse
+    reverseHelper(this, RNil)
+  }
+  def concatenateReverseFirstList[S >: T](remaining: RList[S], acc: RList[S]): RList[S] = remaining match {
+    case RNil => acc
+    case ::(head, tail) => concatenateReverseFirstList(tail, head :: acc)
+  }
+  override def ++[S >: T](lst: RList[S]): RList[S] = {
+    concatenateReverseFirstList(this.reverse, lst)
+  }
+
+  override def removeNthElem(index: Int): RList[T] = {
+    @tailrec
+    def removeHelper(remaining: RList[T], accList: RList[T], counter: Int): RList[T] =remaining match{
+      case RNil => accList.reverse
+      case ::(head, tail) =>
+        if (counter == index) concatenateReverseFirstList(accList, remaining.tail)
+        else removeHelper(tail, head :: accList, counter + 1)
+    }
+    if (index >= 0) removeHelper(this, RNil, 0)
+    else this
   }
 }
  object RList {
@@ -83,18 +104,23 @@ object ListProblemSolutions extends App {
 
   val testCons = ::(1, ::(2, ::(5, ::(3, ::(4, RNil)))))
   val testCons2 = 1 :: 2 :: 5 :: 3 :: 4 :: RNil
+  val testCons3 = 5 :: 3 :: 4 :: RNil
+  val testCons4 = 1 :: 2 :: RNil
   assert(testCons.tail.::(testCons2.head).toString == "[1,2,5,3,4]")
   assert(testCons.apply(1) == 2)
   assert(testCons.apply(0) == 1)
   assert(testCons.apply(4) == 4)
-  try testCons2.apply(22) catch {
-    case e: Exception => println(s"Exception found: $e")
-  }
-  try testCons2.apply(-3) catch {
-    case e: Exception => println(s"Exception found: $e")
-  }
+//  try testCons2.apply(22) catch {
+//    case e: Exception => println(s"Exception found: $e")
+//  }
+//  try testCons2.apply(-3) catch {
+//    case e: Exception => println(s"Exception found: $e")
+//  }
   assert(testCons2.length == 5)
   assert(RNil.length == 0)
   assert(RNil.reverse == RNil)
   assert(testCons.reverse == 4 :: 3 :: 5 :: 2 :: 1 :: RNil)
+  assert(testCons4 ++ testCons3 == testCons)
+  assert(testCons.removeNthElem(0) == ::(2, ::(5, ::(3, ::(4, RNil)))))
+  assert(testCons.removeNthElem(3) == ::(1, ::(2, ::(5, ::(4, RNil)))))
 }
