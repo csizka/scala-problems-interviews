@@ -13,7 +13,11 @@ sealed abstract class RList[+T] {
   def length: Int
   def reverse: RList[T]
   def ++[S >: T](lst: RList[S]): RList[S]
-  def removeNthElem(index: Int): RList[T]
+  def remove(index: Int): RList[T]
+  def map[S](f: T => S): RList[S]
+  def flatMap[S](f: T => RList[S]): RList[S]
+  def flatMapV2[S](f: T => RList[S]): RList[S]
+  def filter(f: T => Boolean): RList[T]
 }
 
 case object RNil extends RList[Nothing] {
@@ -27,7 +31,11 @@ case object RNil extends RList[Nothing] {
   override def length: Int = 0
   override def reverse: RList[Nothing] = RNil
   override def ++[S >: Nothing](lst: RList[S]): RList[S] = lst
-  override def removeNthElem(index: Int): RList[Nothing] = RNil
+  override def remove(index: Int): RList[Nothing] = RNil
+  override def map[S](f: Nothing => S): RList[S] = RNil
+  override def flatMap[S](f: Nothing => RList[S]): RList[S] = RNil
+  override def flatMapV2[S](f: Nothing => RList[S]): RList[S] = RNil
+  override def filter(f: Nothing => Boolean): RList[Nothing] = RNil
 }
 case class ::[+T](override val head: T, override val tail: RList[T]) extends RList[T] {
   override def isEmpty: Boolean = false
@@ -39,7 +47,7 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
       case RNil => stringAcc
       case ::(head, tail) => stringAcc match {
         case "" => toStringTailRec(tail, stringAcc + head)
-        case _ => toStringTailRec(tail, stringAcc + "," + head)
+        case _  => toStringTailRec(tail, stringAcc + "," + head)
       }
     }
     "[" + toStringTailRec(this, "") + "]"
@@ -57,7 +65,7 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
   override def length: Int = {
     @tailrec
     def lengthHelper(remainingList: RList[T], count: Int): Int = remainingList match {
-      case RNil => count
+      case RNil           => count
       case ::(head, tail) => lengthHelper(tail, count + 1)
     }
     lengthHelper(this, 0)
@@ -65,29 +73,63 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
   override def reverse: RList[T] = {
     @tailrec
     def reverseHelper(rest: RList[T], acc: RList[T]): RList[T] = rest match {
-      case RNil => acc
+      case RNil           => acc
       case ::(head, tail) => reverseHelper(tail, head :: acc)
     }
     reverseHelper(this, RNil)
   }
   def concatenateReverseFirstList[S >: T](remaining: RList[S], acc: RList[S]): RList[S] = remaining match {
-    case RNil => acc
+    case RNil           => acc
     case ::(head, tail) => concatenateReverseFirstList(tail, head :: acc)
   }
   override def ++[S >: T](lst: RList[S]): RList[S] = {
     concatenateReverseFirstList(this.reverse, lst)
   }
 
-  override def removeNthElem(index: Int): RList[T] = {
+  override def remove(index: Int): RList[T] = {
     @tailrec
     def removeHelper(remaining: RList[T], accList: RList[T], counter: Int): RList[T] =remaining match{
-      case RNil => accList.reverse
+      case RNil           => accList.reverse
       case ::(head, tail) =>
         if (counter == index) concatenateReverseFirstList(accList, remaining.tail)
         else removeHelper(tail, head :: accList, counter + 1)
     }
     if (index >= 0) removeHelper(this, RNil, 0)
     else this
+  }
+  override def map[S](f: T => S): RList[S] = {
+    @tailrec
+    def mapHelper(rest: RList[T], acc: RList[S]): RList[S] = rest match {
+      case RNil           => acc.reverse
+      case ::(head, tail) => mapHelper(tail, f(head) :: acc)
+    }
+    mapHelper(this, RNil)
+  }
+  override def flatMap[S](f: T => RList[S]): RList[S] = {
+    @tailrec
+    def flatMapHelper(remaining: RList[T], acc: RList[S]): RList[S] = remaining match {
+      case RNil           => acc
+      case ::(head, tail) => flatMapHelper(tail, acc ++  f(head))
+    }
+    flatMapHelper(this, RNil)
+  }
+  def flatMapV2[S](f: T => RList[S]): RList[S] = {
+    @tailrec
+    def flatMapHelper(remaining: RList[T], acc: RList[S]): RList[S] = remaining match {
+      case RNil => acc.reverse
+      case ::(head, tail) => flatMapHelper(tail, f(head).reverse ++ acc )
+    }
+    flatMapHelper(this, RNil)
+  }
+  override def filter(f: T => Boolean): RList[T] = {
+    @tailrec
+    def filterHelper(rest: RList[T], acc: RList[T]): RList[T] = rest match {
+      case RNil => acc.reverse
+      case ::(head, tail) =>
+        if (f(head)) filterHelper(tail, head :: acc)
+        else filterHelper(tail, acc)
+    }
+    filterHelper(this, RNil)
   }
 }
  object RList {
@@ -106,6 +148,7 @@ object ListProblemSolutions extends App {
   val testCons2 = 1 :: 2 :: 5 :: 3 :: 4 :: RNil
   val testCons3 = 5 :: 3 :: 4 :: RNil
   val testCons4 = 1 :: 2 :: RNil
+  val aLargeList = RList.from(1 to 10000)
   assert(testCons.tail.::(testCons2.head).toString == "[1,2,5,3,4]")
   assert(testCons.apply(1) == 2)
   assert(testCons.apply(0) == 1)
@@ -121,6 +164,16 @@ object ListProblemSolutions extends App {
   assert(RNil.reverse == RNil)
   assert(testCons.reverse == 4 :: 3 :: 5 :: 2 :: 1 :: RNil)
   assert(testCons4 ++ testCons3 == testCons)
-  assert(testCons.removeNthElem(0) == ::(2, ::(5, ::(3, ::(4, RNil)))))
-  assert(testCons.removeNthElem(3) == ::(1, ::(2, ::(5, ::(4, RNil)))))
+  assert(testCons.remove(0) == ::(2, ::(5, ::(3, ::(4, RNil)))))
+  assert(testCons.remove(3) == ::(1, ::(2, ::(5, ::(4, RNil)))))
+  assert(testCons2.filter(_ % 2 == 0) == 2 :: 4 :: RNil)
+  assert(testCons.map(x => x * 2) == 2 :: 4 :: 10 :: 6 :: 8 :: RNil)
+  assert(testCons.flatMap(x => x :: x * 2 :: RNil) == 1 :: 2 :: 2 :: 4 :: 5 :: 10 :: 3 :: 6 :: 4 :: 8 :: RNil)
+  val time = System.currentTimeMillis()
+  aLargeList.flatMap(x => x :: 2 * x :: RNil)
+  val flatMapV1Time = System.currentTimeMillis()-time
+  val secondTime = System.currentTimeMillis()
+  aLargeList.flatMapV2(x => x :: 2 * x :: RNil)
+  val flatMapV2Time = System.currentTimeMillis() - secondTime
+  assert(flatMapV1Time > flatMapV2Time)
 }
