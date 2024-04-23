@@ -1,6 +1,7 @@
 package com.rockthejvm
 
 import scala.annotation.tailrec
+import scala.util.Random
 
 sealed abstract class RList[+T] {
   def head: T
@@ -22,7 +23,8 @@ sealed abstract class RList[+T] {
   def runLengthEncodingConseq: RList[(T, Int)]
   def repeatElems(n: Int): RList[T]
   def shiftLeft(n: Int): RList[T]
-
+  def getRandElems(n: Int): RList[T]
+  def getRandElemsV2(n: Int): RList[T]
 }
 
 case object RNil extends RList[Nothing] {
@@ -45,6 +47,8 @@ case object RNil extends RList[Nothing] {
   override def runLengthEncodingConseq: RList[(Nothing, Int)] = RNil
   override def repeatElems(n: Int): RList[Nothing] = RNil
   override def shiftLeft(n: Int): RList[Nothing] = RNil
+  override def getRandElems(n: Int): RList[Nothing] = RNil
+  override def getRandElemsV2(n: Int): RList[Nothing] = RNil
 }
 case class ::[+T](override val head: T, override val tail: RList[T]) extends RList[T] {
   override def isEmpty: Boolean = false
@@ -94,7 +98,6 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
   override def ++[S >: T](lst: RList[S]): RList[S] = {
     concatenateReverseFirstList(this.reverse, lst)
   }
-
   override def remove(index: Int): RList[T] = {
     @tailrec
     def removeHelper(remaining: RList[T], accList: RList[T], counter: Int): RList[T] =remaining match{
@@ -140,7 +143,6 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     filterHelper(this, RNil)
   }
-
   override def runLengthEncodingNonConseq: RList[(T, Int)] = {
     @tailrec
     def sorter(elem: T, rest: RList[(T, Int)], checked: RList[(T, Int)]): RList[(T, Int)] = rest match {
@@ -156,7 +158,6 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     rleHelper(this, RNil)
   }
-
   override def runLengthEncodingConseq: RList[(T, Int)] = {
     @tailrec
     def rleConseqHelper(remaining: RList[T], acc: RList[(T, Int)]): RList[(T, Int)] = remaining match {
@@ -193,6 +194,21 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     shiftHelper(this, 0, RNil)
   }
+  override def getRandElems(n: Int): RList[T] = {
+    val size = this.length
+    val rand = new Random(System.currentTimeMillis())
+    @tailrec
+    def getHelper(count: Int, acc: RList[T]): RList[T] = {
+      if (count < n) getHelper(count + 1, this(rand.nextInt(size)) :: acc)
+      else acc
+    }
+    getHelper(0, RNil)
+  }
+  def getRandElemsV2(k: Int): RList[T] = {
+    val rand = new Random(System.currentTimeMillis())
+    RList.from(1 to k).map(x => this(rand.nextInt(this.length)))
+  }
+
 }
  object RList {
    def from[T](iterable: Iterable[T]): RList[T] = {
@@ -250,4 +266,7 @@ object ListProblemSolutions extends App {
   assert(testCons.shiftLeft(2) ==  testCons.shiftLeft(7))
   assert(testCons3.shiftLeft(3) == testCons3)
   assert(testCons3.shiftLeft(3) == testCons3.shiftLeft(9))
+  println(testCons2.getRandElems(7))
+  println(testCons2.getRandElemsV2(7))
+
 }
