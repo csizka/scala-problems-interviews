@@ -18,6 +18,8 @@ sealed abstract class RList[+T] {
   def flatMap[S](f: T => RList[S]): RList[S]
   def flatMapV2[S](f: T => RList[S]): RList[S]
   def filter(f: T => Boolean): RList[T]
+  def runLengthEncodingNonConseq: RList[(T, Int)]
+  def runLengthEncodingConseq: RList[(T, Int)]
 }
 
 case object RNil extends RList[Nothing] {
@@ -36,6 +38,8 @@ case object RNil extends RList[Nothing] {
   override def flatMap[S](f: Nothing => RList[S]): RList[S] = RNil
   override def flatMapV2[S](f: Nothing => RList[S]): RList[S] = RNil
   override def filter(f: Nothing => Boolean): RList[Nothing] = RNil
+  override def runLengthEncodingNonConseq: RList[(Nothing, Int)] = RNil
+  override def runLengthEncodingConseq: RList[(Nothing, Int)] = RNil
 }
 case class ::[+T](override val head: T, override val tail: RList[T]) extends RList[T] {
   override def isEmpty: Boolean = false
@@ -124,12 +128,42 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
   override def filter(f: T => Boolean): RList[T] = {
     @tailrec
     def filterHelper(rest: RList[T], acc: RList[T]): RList[T] = rest match {
-      case RNil => acc.reverse
+      case RNil           => acc.reverse
       case ::(head, tail) =>
         if (f(head)) filterHelper(tail, head :: acc)
         else filterHelper(tail, acc)
     }
     filterHelper(this, RNil)
+  }
+
+  override def runLengthEncodingNonConseq: RList[(T, Int)] = {
+    @tailrec
+    def sorter(elem: T, rest: RList[(T, Int)], checked: RList[(T, Int)]): RList[(T, Int)] = rest match {
+      case RNil                 =>  (elem, 1) :: checked
+      case ::((fst, snd), tail) =>
+        if (fst == elem) (elem, snd + 1) :: checked ++ tail
+        else sorter(elem, tail, (fst, snd) :: checked)
+    }
+    @tailrec
+    def rleHelper(rest: RList[T], acc: RList[(T, Int)]): RList[(T, Int)] = rest match {
+      case RNil => acc
+      case ::(head, tail) => rleHelper(tail, sorter(head, acc, RNil))
+    }
+    rleHelper(this, RNil)
+  }
+
+  override def runLengthEncodingConseq: RList[(T, Int)] = {
+    @tailrec
+    def rleConseqHelper(remaining: RList[T], acc: RList[(T, Int)]): RList[(T, Int)] = remaining match {
+      case RNil           => acc.reverse
+      case ::(head, tail) => acc match {
+        case RNil                        => rleConseqHelper(tail, (head, 1) :: RNil)
+        case ::((fstElem, fstNum), rest) =>
+          if (head == fstElem) rleConseqHelper(tail, (head, fstNum + 1) :: rest)
+          else rleConseqHelper(tail, (head, 1) :: acc)
+      }
+    }
+    rleConseqHelper(this, RNil)
   }
 }
  object RList {
@@ -149,6 +183,11 @@ object ListProblemSolutions extends App {
   val testCons3 = 5 :: 3 :: 4 :: RNil
   val testCons4 = 1 :: 2 :: RNil
   val aLargeList = RList.from(1 to 10000)
+  val testCons5 = testCons ++ testCons4 ++ testCons4 ++ testCons
+  val testCons6 = testCons.flatMap{
+    x =>
+      if (x % 2 == 0) x :: x :: x :: RNil
+      else x :: 2 * x :: RNil}
   assert(testCons.tail.::(testCons2.head).toString == "[1,2,5,3,4]")
   assert(testCons.apply(1) == 2)
   assert(testCons.apply(0) == 1)
@@ -176,4 +215,6 @@ object ListProblemSolutions extends App {
   aLargeList.flatMapV2(x => x :: 2 * x :: RNil)
   val flatMapV2Time = System.currentTimeMillis() - secondTime
   assert(flatMapV1Time > flatMapV2Time)
+  assert(testCons5.runLengthEncodingNonConseq == (4,2) :: (2,4) :: (1,4) :: (3,2) :: (5,2) :: RNil)
+  assert(testCons6.runLengthEncodingConseq == (1,1) :: (2,4) :: (5,1) :: (10,1) :: (3,1) :: (6,1) :: (4,3) :: RNil)
 }
