@@ -20,6 +20,8 @@ sealed abstract class RList[+T] {
   def filter(f: T => Boolean): RList[T]
   def runLengthEncodingNonConseq: RList[(T, Int)]
   def runLengthEncodingConseq: RList[(T, Int)]
+  def repeatElems(n: Int): RList[T]
+  def
 }
 
 case object RNil extends RList[Nothing] {
@@ -40,6 +42,7 @@ case object RNil extends RList[Nothing] {
   override def filter(f: Nothing => Boolean): RList[Nothing] = RNil
   override def runLengthEncodingNonConseq: RList[(Nothing, Int)] = RNil
   override def runLengthEncodingConseq: RList[(Nothing, Int)] = RNil
+  override def repeatElems(n: Int): RList[Nothing] = RNil
 }
 case class ::[+T](override val head: T, override val tail: RList[T]) extends RList[T] {
   override def isEmpty: Boolean = false
@@ -165,6 +168,18 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     rleConseqHelper(this, RNil)
   }
+
+  override def repeatElems(n: Int): RList[T] = {
+    @tailrec
+    def repeatHelper(rest: RList[T], count: Int, acc: RList[T]): RList[T] = rest match {
+      case RNil => acc.reverse
+      case ::(head, tail) =>
+        if (count > 1 ) repeatHelper(rest, count - 1, head :: acc)
+        else if (count == 1) repeatHelper(tail, n, head :: acc)
+        else rest
+    }
+    repeatHelper(this, n, RNil)
+  }
 }
  object RList {
    def from[T](iterable: Iterable[T]): RList[T] = {
@@ -217,4 +232,5 @@ object ListProblemSolutions extends App {
   assert(flatMapV1Time > flatMapV2Time)
   assert(testCons5.runLengthEncodingNonConseq == (4,2) :: (2,4) :: (1,4) :: (3,2) :: (5,2) :: RNil)
   assert(testCons6.runLengthEncodingConseq == (1,1) :: (2,4) :: (5,1) :: (10,1) :: (3,1) :: (6,1) :: (4,3) :: RNil)
+  assert(testCons3.repeatElems(3) == 5 :: 5 :: 5 :: 3 :: 3 :: 3 :: 4 :: 4 :: 4 :: RNil)
 }
