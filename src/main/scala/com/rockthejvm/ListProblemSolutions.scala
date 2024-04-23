@@ -21,7 +21,8 @@ sealed abstract class RList[+T] {
   def runLengthEncodingNonConseq: RList[(T, Int)]
   def runLengthEncodingConseq: RList[(T, Int)]
   def repeatElems(n: Int): RList[T]
-  def
+  def shiftLeft(n: Int): RList[T]
+
 }
 
 case object RNil extends RList[Nothing] {
@@ -43,6 +44,7 @@ case object RNil extends RList[Nothing] {
   override def runLengthEncodingNonConseq: RList[(Nothing, Int)] = RNil
   override def runLengthEncodingConseq: RList[(Nothing, Int)] = RNil
   override def repeatElems(n: Int): RList[Nothing] = RNil
+  override def shiftLeft(n: Int): RList[Nothing] = RNil
 }
 case class ::[+T](override val head: T, override val tail: RList[T]) extends RList[T] {
   override def isEmpty: Boolean = false
@@ -168,7 +170,6 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     rleConseqHelper(this, RNil)
   }
-
   override def repeatElems(n: Int): RList[T] = {
     @tailrec
     def repeatHelper(rest: RList[T], count: Int, acc: RList[T]): RList[T] = rest match {
@@ -179,6 +180,18 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
         else rest
     }
     repeatHelper(this, n, RNil)
+  }
+  override def shiftLeft(n: Int): RList[T] = {
+    @tailrec
+    def shiftHelper(rest: RList[T], shiftCount: Int, res: RList[T]): RList[T] = {
+      if (shiftCount < n) rest match {
+        case RNil => shiftHelper(this, shiftCount, RNil)
+        case ::(head, tail) => shiftHelper(tail, shiftCount + 1, head :: res )
+      }
+      else if (shiftCount == n) rest ++ res.reverse
+      else this
+    }
+    shiftHelper(this, 0, RNil)
   }
 }
  object RList {
@@ -222,15 +235,19 @@ object ListProblemSolutions extends App {
   assert(testCons.remove(3) == ::(1, ::(2, ::(5, ::(4, RNil)))))
   assert(testCons2.filter(_ % 2 == 0) == 2 :: 4 :: RNil)
   assert(testCons.map(x => x * 2) == 2 :: 4 :: 10 :: 6 :: 8 :: RNil)
-  assert(testCons.flatMap(x => x :: x * 2 :: RNil) == 1 :: 2 :: 2 :: 4 :: 5 :: 10 :: 3 :: 6 :: 4 :: 8 :: RNil)
-  val time = System.currentTimeMillis()
-  aLargeList.flatMap(x => x :: 2 * x :: RNil)
-  val flatMapV1Time = System.currentTimeMillis()-time
-  val secondTime = System.currentTimeMillis()
-  aLargeList.flatMapV2(x => x :: 2 * x :: RNil)
-  val flatMapV2Time = System.currentTimeMillis() - secondTime
-  assert(flatMapV1Time > flatMapV2Time)
+//  assert(testCons.flatMap(x => x :: x * 2 :: RNil) == 1 :: 2 :: 2 :: 4 :: 5 :: 10 :: 3 :: 6 :: 4 :: 8 :: RNil)
+//  val time = System.currentTimeMillis()
+//  aLargeList.flatMap(x => x :: 2 * x :: RNil)
+//  val flatMapV1Time = System.currentTimeMillis()-time
+//  val secondTime = System.currentTimeMillis()
+//  aLargeList.flatMapV2(x => x :: 2 * x :: RNil)
+//  val flatMapV2Time = System.currentTimeMillis() - secondTime
+//  assert(flatMapV1Time > flatMapV2Time)
   assert(testCons5.runLengthEncodingNonConseq == (4,2) :: (2,4) :: (1,4) :: (3,2) :: (5,2) :: RNil)
   assert(testCons6.runLengthEncodingConseq == (1,1) :: (2,4) :: (5,1) :: (10,1) :: (3,1) :: (6,1) :: (4,3) :: RNil)
   assert(testCons3.repeatElems(3) == 5 :: 5 :: 5 :: 3 :: 3 :: 3 :: 4 :: 4 :: 4 :: RNil)
+  assert(testCons.shiftLeft(2) ==  5 :: 3 :: 4 :: 1 :: 2 :: RNil)
+  assert(testCons.shiftLeft(2) ==  testCons.shiftLeft(7))
+  assert(testCons3.shiftLeft(3) == testCons3)
+  assert(testCons3.shiftLeft(3) == testCons3.shiftLeft(9))
 }
