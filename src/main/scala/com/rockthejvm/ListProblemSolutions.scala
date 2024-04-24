@@ -117,21 +117,21 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     mapHelper(this, RNil)
   }
-  override def flatMap[S](f: T => RList[S]): RList[S] = {
+  override def flatMapV2[S](f: T => RList[S]): RList[S] = {
     @tailrec
     def flatMapHelper(remaining: RList[T], acc: RList[S]): RList[S] = remaining match {
-      case RNil           => acc
-      case ::(head, tail) => flatMapHelper(tail, acc ++  f(head))
-    }
-    flatMapHelper(this, RNil)
-  }
-  def flatMapV2[S](f: T => RList[S]): RList[S] = {
-    @tailrec
-    def flatMapHelper(remaining: RList[T], acc: RList[S]): RList[S] = remaining match {
-      case RNil => acc.reverse
+      case RNil           => acc.reverse
       case ::(head, tail) => flatMapHelper(tail, f(head).reverse ++ acc )
     }
     flatMapHelper(this, RNil)
+  }
+  override def flatMap[S](f: T => RList[S]): RList[S] = {
+    @tailrec
+    def betterFlatMapHelper(remaining: RList[T], acc: RList[RList[S]]): RList[S] = remaining match {
+      case RNil => RList.concatenateAll(acc, RNil)
+      case ::(head, tail) => betterFlatMapHelper(tail, f(head).reverse :: acc)
+    }
+    betterFlatMapHelper(this, RNil)
   }
   override def filter(f: T => Boolean): RList[T] = {
     @tailrec
@@ -204,11 +204,10 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     getHelper(0, RNil)
   }
-  def getRandElemsV2(k: Int): RList[T] = {
+  override def getRandElemsV2(k: Int): RList[T] = {
     val rand = new Random(System.currentTimeMillis())
     RList.from(1 to k).map(x => this(rand.nextInt(this.length)))
   }
-
 }
  object RList {
    def from[T](iterable: Iterable[T]): RList[T] = {
@@ -219,6 +218,14 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
      }
     convertToRList(iterable, RNil)
    }
+   @tailrec
+   def concatenateAll[S](elems: RList[RList[S]], acc: RList[S]): RList[S] = elems match {
+     case RNil => acc
+     case ::(fstHead, fstTail) => fstHead match {
+       case RNil => concatenateAll(fstTail, acc)
+       case ::(fst, rest) => concatenateAll(rest :: fstTail, fst :: acc)
+     }
+   }
  }
 object ListProblemSolutions extends App {
 
@@ -226,7 +233,7 @@ object ListProblemSolutions extends App {
   val testCons2 = 1 :: 2 :: 5 :: 3 :: 4 :: RNil
   val testCons3 = 5 :: 3 :: 4 :: RNil
   val testCons4 = 1 :: 2 :: RNil
-  val aLargeList = RList.from(1 to 10000)
+  val aLargeList = RList.from(1 to 50000)
   val testCons5 = testCons ++ testCons4 ++ testCons4 ++ testCons
   val testCons6 = testCons.flatMap{
     x =>
@@ -251,14 +258,13 @@ object ListProblemSolutions extends App {
   assert(testCons.remove(3) == ::(1, ::(2, ::(5, ::(4, RNil)))))
   assert(testCons2.filter(_ % 2 == 0) == 2 :: 4 :: RNil)
   assert(testCons.map(x => x * 2) == 2 :: 4 :: 10 :: 6 :: 8 :: RNil)
-//  assert(testCons.flatMap(x => x :: x * 2 :: RNil) == 1 :: 2 :: 2 :: 4 :: 5 :: 10 :: 3 :: 6 :: 4 :: 8 :: RNil)
-//  val time = System.currentTimeMillis()
-//  aLargeList.flatMap(x => x :: 2 * x :: RNil)
-//  val flatMapV1Time = System.currentTimeMillis()-time
-//  val secondTime = System.currentTimeMillis()
-//  aLargeList.flatMapV2(x => x :: 2 * x :: RNil)
-//  val flatMapV2Time = System.currentTimeMillis() - secondTime
-//  assert(flatMapV1Time > flatMapV2Time)
+  assert(testCons.flatMap(x => x :: x * 2 :: RNil) == 1 :: 2 :: 2 :: 4 :: 5 :: 10 :: 3 :: 6 :: 4 :: 8 :: RNil)
+  val time = System.currentTimeMillis()
+  aLargeList.flatMap(x => x :: 2 * x :: RNil)
+  val flatMapV1Time = System.currentTimeMillis() - time
+  val secondTime = System.currentTimeMillis()
+  aLargeList.flatMapV2(x => x :: 2 * x :: RNil)
+  val flatMapV2Time = System.currentTimeMillis() - secondTime
   assert(testCons5.runLengthEncodingNonConseq == (4,2) :: (2,4) :: (1,4) :: (3,2) :: (5,2) :: RNil)
   assert(testCons6.runLengthEncodingConseq == (1,1) :: (2,4) :: (5,1) :: (10,1) :: (3,1) :: (6,1) :: (4,3) :: RNil)
   assert(testCons3.repeatElems(3) == 5 :: 5 :: 5 :: 3 :: 3 :: 3 :: 4 :: 4 :: 4 :: RNil)
@@ -266,7 +272,7 @@ object ListProblemSolutions extends App {
   assert(testCons.shiftLeft(2) ==  testCons.shiftLeft(7))
   assert(testCons3.shiftLeft(3) == testCons3)
   assert(testCons3.shiftLeft(3) == testCons3.shiftLeft(9))
-  println(testCons2.getRandElems(7))
-  println(testCons2.getRandElemsV2(7))
+//  println(testCons2.getRandElems(7))
+//  println(testCons2.getRandElemsV2(7))
 
 }
