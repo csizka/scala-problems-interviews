@@ -1,5 +1,7 @@
 package com.rockthejvm
 
+import com.rockthejvm.RList.{concatenateAllReverseFirst, concatenateReverseFirstList}
+
 import scala.annotation.tailrec
 import scala.util.Random
 
@@ -25,6 +27,17 @@ sealed abstract class RList[+T] {
   def shiftLeft(n: Int): RList[T]
   def getRandElems(n: Int): RList[T]
   def getRandElemsV2(n: Int): RList[T]
+  def sorted[S >: T](ordering: Ordering[S]): RList[S]
+  def insertInOrder[S >: T](elem: S, ordering: Ordering[S]): RList[S] = {
+    @tailrec
+    def insertHelper(elem: S, inspected: RList[S], rest: RList[S]): RList[S] = rest match {
+      case RNil => (elem :: inspected).reverse
+      case ::(head, tail) =>
+        if (ordering.gt(elem, head)) insertHelper(elem, head :: inspected, tail)
+        else concatenateReverseFirstList(elem :: inspected, rest)
+    }
+    insertHelper(elem, RNil, this)
+  }
 }
 
 case object RNil extends RList[Nothing] {
@@ -49,6 +62,7 @@ case object RNil extends RList[Nothing] {
   override def shiftLeft(n: Int): RList[Nothing] = RNil
   override def getRandElems(n: Int): RList[Nothing] = RNil
   override def getRandElemsV2(n: Int): RList[Nothing] = RNil
+  override def sorted[S >: Nothing](ordering: Ordering[S]): RList[S] = RNil
 }
 case class ::[+T](override val head: T, override val tail: RList[T]) extends RList[T] {
   override def isEmpty: Boolean = false
@@ -91,10 +105,6 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     reverseHelper(this, RNil)
   }
-  def concatenateReverseFirstList[S >: T](remaining: RList[S], acc: RList[S]): RList[S] = remaining match {
-    case RNil           => acc
-    case ::(head, tail) => concatenateReverseFirstList(tail, head :: acc)
-  }
   override def ++[S >: T](lst: RList[S]): RList[S] = {
     concatenateReverseFirstList(this.reverse, lst)
   }
@@ -103,7 +113,7 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     def removeHelper(remaining: RList[T], accList: RList[T], counter: Int): RList[T] =remaining match{
       case RNil           => accList.reverse
       case ::(head, tail) =>
-        if (counter == index) concatenateReverseFirstList(accList, remaining.tail)
+        if (counter == index) RList.concatenateReverseFirstList(accList, remaining.tail)
         else removeHelper(tail, head :: accList, counter + 1)
     }
     if (index >= 0) removeHelper(this, RNil, 0)
@@ -128,7 +138,7 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
   override def flatMap[S](f: T => RList[S]): RList[S] = {
     @tailrec
     def betterFlatMapHelper(remaining: RList[T], acc: RList[RList[S]]): RList[S] = remaining match {
-      case RNil => RList.concatenateAll(acc, RNil)
+      case RNil => RList.concatenateAllReverseFirst(acc, RNil)
       case ::(head, tail) => betterFlatMapHelper(tail, f(head).reverse :: acc)
     }
     betterFlatMapHelper(this, RNil)
@@ -208,6 +218,14 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     val rand = new Random(System.currentTimeMillis())
     RList.from(1 to k).map(x => this(rand.nextInt(this.length)))
   }
+  override def sorted[S >: T](ordering: Ordering[S]): RList[S] = {
+    @tailrec
+    def orderingHelper(rest: RList[S], acc: RList[S]): RList[S] = rest match {
+      case RNil           => acc
+      case ::(head, tail) => orderingHelper(tail, acc.insertInOrder(head, ordering))
+    }
+    orderingHelper(this, RNil)
+  }
 }
  object RList {
    def from[T](iterable: Iterable[T]): RList[T] = {
@@ -219,12 +237,17 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     convertToRList(iterable, RNil)
    }
    @tailrec
-   def concatenateAll[S](elems: RList[RList[S]], acc: RList[S]): RList[S] = elems match {
+   def concatenateAllReverseFirst[S](elems: RList[RList[S]], acc: RList[S]): RList[S] = elems match {
      case RNil => acc
-     case ::(fstHead, fstTail) => fstHead match {
-       case RNil => concatenateAll(fstTail, acc)
-       case ::(fst, rest) => concatenateAll(rest :: fstTail, fst :: acc)
+     case ::(head, tail) => head match {
+       case RNil => concatenateAllReverseFirst(tail, acc)
+       case ::(fst, rest) => concatenateAllReverseFirst(rest :: tail, fst :: acc)
      }
+   }
+   @tailrec
+   def concatenateReverseFirstList[S](remaining: RList[S], acc: RList[S]): RList[S] = remaining match {
+     case RNil => acc
+     case ::(head, tail) => concatenateReverseFirstList(tail, head :: acc)
    }
  }
 object ListProblemSolutions extends App {
@@ -259,6 +282,7 @@ object ListProblemSolutions extends App {
   assert(testCons2.filter(_ % 2 == 0) == 2 :: 4 :: RNil)
   assert(testCons.map(x => x * 2) == 2 :: 4 :: 10 :: 6 :: 8 :: RNil)
   assert(testCons.flatMap(x => x :: x * 2 :: RNil) == 1 :: 2 :: 2 :: 4 :: 5 :: 10 :: 3 :: 6 :: 4 :: 8 :: RNil)
+  assert(testCons.flatMapV2(x => x :: x * 2 :: RNil) == 1 :: 2 :: 2 :: 4 :: 5 :: 10 :: 3 :: 6 :: 4 :: 8 :: RNil)
   val time = System.currentTimeMillis()
   aLargeList.flatMap(x => x :: 2 * x :: RNil)
   val flatMapV1Time = System.currentTimeMillis() - time
@@ -274,5 +298,8 @@ object ListProblemSolutions extends App {
   assert(testCons3.shiftLeft(3) == testCons3.shiftLeft(9))
 //  println(testCons2.getRandElems(7))
 //  println(testCons2.getRandElemsV2(7))
+  val ordering = Ordering.fromLessThan[Int](_ < _)
+  assert(testCons2.sorted(ordering) == 1 :: 2 :: 3 :: 4 :: 5 :: RNil)
+
 
 }
