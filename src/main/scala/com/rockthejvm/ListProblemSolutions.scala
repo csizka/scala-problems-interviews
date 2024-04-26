@@ -1,6 +1,6 @@
 package com.rockthejvm
 
-import com.rockthejvm.RList.{concatenateAllReverseFirst, concatenateReverseFirstList}
+import com.rockthejvm.RList.concatenateReverseFirstList
 
 import scala.annotation.tailrec
 import scala.util.Random
@@ -27,7 +27,7 @@ sealed abstract class RList[+T] {
   def shiftLeft(n: Int): RList[T]
   def getRandElems(n: Int): RList[T]
   def getRandElemsV2(n: Int): RList[T]
-  def sorted[S >: T](ordering: Ordering[S]): RList[S]
+  def insertionSort[S >: T](ordering: Ordering[S]): RList[S]
   def insertInOrder[S >: T](elem: S, ordering: Ordering[S]): RList[S] = {
     @tailrec
     def insertHelper(elem: S, inspected: RList[S], rest: RList[S]): RList[S] = rest match {
@@ -38,6 +38,8 @@ sealed abstract class RList[+T] {
     }
     insertHelper(elem, RNil, this)
   }
+  def mergeSort[S >: T](ordering: Ordering[S]): RList[S]
+  def mergeSortedLists[S >: T](ordering: Ordering[S], toMergeWith: RList[S]): RList[S]
 }
 
 case object RNil extends RList[Nothing] {
@@ -62,7 +64,9 @@ case object RNil extends RList[Nothing] {
   override def shiftLeft(n: Int): RList[Nothing] = RNil
   override def getRandElems(n: Int): RList[Nothing] = RNil
   override def getRandElemsV2(n: Int): RList[Nothing] = RNil
-  override def sorted[S >: Nothing](ordering: Ordering[S]): RList[S] = RNil
+  override def insertionSort[S >: Nothing](ordering: Ordering[S]): RList[S] = RNil
+  override def mergeSort[S >: Nothing](ordering: Ordering[S]): RList[S] = RNil
+  override def mergeSortedLists[S >: Nothing](ordering: Ordering[S], toMergeWith: RList[S]): RList[S] = toMergeWith
 }
 case class ::[+T](override val head: T, override val tail: RList[T]) extends RList[T] {
   override def isEmpty: Boolean = false
@@ -184,7 +188,7 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
   override def repeatElems(n: Int): RList[T] = {
     @tailrec
     def repeatHelper(rest: RList[T], count: Int, acc: RList[T]): RList[T] = rest match {
-      case RNil => acc.reverse
+      case RNil           => acc.reverse
       case ::(head, tail) =>
         if (count > 1 ) repeatHelper(rest, count - 1, head :: acc)
         else if (count == 1) repeatHelper(tail, n, head :: acc)
@@ -218,13 +222,42 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     val rand = new Random(System.currentTimeMillis())
     RList.from(1 to k).map(x => this(rand.nextInt(this.length)))
   }
-  override def sorted[S >: T](ordering: Ordering[S]): RList[S] = {
+  override def insertionSort[S >: T](ordering: Ordering[S]): RList[S] = {
     @tailrec
     def orderingHelper(rest: RList[S], acc: RList[S]): RList[S] = rest match {
       case RNil           => acc
       case ::(head, tail) => orderingHelper(tail, acc.insertInOrder(head, ordering))
     }
     orderingHelper(this, RNil)
+  }
+  override def mergeSortedLists[S >: T](ordering: Ordering[S], toMergeWith: RList[S]): RList[S] = {
+    @tailrec
+    def mergeHelper(list1: RList[S], list2: RList[S], acc: RList[S]): RList[S] =  list1 match {
+      case RNil               => concatenateReverseFirstList(acc, list2)
+      case ::(head1, tail1)   => list2 match {
+        case RNil               => concatenateReverseFirstList(acc, list1)
+        case ::(head2, tail2)   =>
+          if (ordering.gt(head1, head2)) mergeHelper(list1, tail2, head2 :: acc)
+          else mergeHelper(tail1, list2, head1 :: acc)
+    }
+    }
+    mergeHelper(this, toMergeWith, RNil)
+  }
+  override def mergeSort[S >: T](ordering: Ordering[S]): RList[S] = {
+    @tailrec
+    def msTailRec(ls: RList[RList[S]], acc: RList[RList[S]]): RList[S] = ls match {
+      case RNil => acc match {
+        case RNil => RNil
+        case head :: RNil => head
+        case ::(head, tail) => msTailRec(acc, RNil)
+        }
+      case ::(fst, RNil)      => acc match {
+        case RNil               => fst
+        case ::(head, tail)     => msTailRec(fst :: acc, RNil)
+        }
+      case fst :: snd :: rest => msTailRec(rest, fst.mergeSortedLists(ordering, snd) :: acc)
+    }
+    msTailRec(this.map( x => x :: RNil), RNil)
   }
 }
  object RList {
@@ -299,7 +332,20 @@ object ListProblemSolutions extends App {
 //  println(testCons2.getRandElems(7))
 //  println(testCons2.getRandElemsV2(7))
   val ordering = Ordering.fromLessThan[Int](_ < _)
-  assert(testCons2.sorted(ordering) == 1 :: 2 :: 3 :: 4 :: 5 :: RNil)
-
+  assert(testCons2.insertionSort(ordering) == 1 :: 2 :: 3 :: 4 :: 5 :: RNil)
+  assert(testCons.insertionSort(ordering) == testCons.mergeSort(ordering))
+  assert(testCons.mergeSort(ordering) == testCons.insertionSort(ordering))
+  val randomList = aLargeList.getRandElemsV2(5000)
+//  val insertTest0 = System.currentTimeMillis()
+  val insertionSortedList = randomList.insertionSort(ordering)
+//  val insertTime = System.currentTimeMillis() - insertTest0
+//  println(insertTime)
+//  val mergeTest0 = System.currentTimeMillis()
+  val mergeSortedList = randomList.mergeSort(ordering)
+//  val mergeTime = System.currentTimeMillis() - mergeTest0
+//  println(mergeTime)
+  assert(mergeSortedList == insertionSortedList)
+  val testConss = ::(3,RNil)
+  assert(testConss.mergeSort(ordering) == ::(3, RNil))
 
 }
