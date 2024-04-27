@@ -436,48 +436,32 @@ object ListProblemSolutions extends App {
   assert(testCons.shiftLeft(2) ==  testCons.shiftLeft(7))
   assert(testCons3.shiftLeft(3) == testCons3)
   assert(testCons3.shiftLeft(3) == testCons3.shiftLeft(9))
-//  println(testCons2.getRandElems(7))
-//  println(testCons2.getRandElemsV2(7))
+  assert(testCons2.zip(testCons3) == (1,5) :: (2,3) :: (5,4) :: RNil)
+  assert(trueList.repeatElems(100000).all(identity))
+  assert(!(trueList.repeatElems(100000) ++ (false :: RNil)).all(identity))
+  //Sort Tests
+  // val randomList = aLargeList.getRandElemsV2(10000, Some(100)) // SO
+  val randomList = aLargeList.getRandElemsV2(7000, Some(83))
   val ordering = Ordering.fromLessThan[Int](_ < _)
+  val testConss = ::(3, RNil)
+  assert(testConss.mergeSort(ordering) == ::(3, RNil))
+  def measureAndTestSort[T](input: RList[T], sortFun: (RList[T], Ordering[T]) => RList[T], ordering: Ordering[T]): Unit = {
+    val startTime = System.currentTimeMillis()
+    val quickSortedList = sortFun(input, ordering)
+    val testTime = System.currentTimeMillis() - startTime
+    assert(quickSortedList.isSortedVOf(input, ordering))
+    println(testTime)
+  }
+  measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.quickSort(ordering), ordering)
+  measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.mergeSort(ordering), ordering)
+  measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.insertionSort(ordering), ordering)
+//  measueAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.quickSortV2(ordering), ordering)
+
   assert(testCons2.insertionSort(ordering) == 1 :: 2 :: 3 :: 4 :: 5 :: RNil)
   assert(testCons.insertionSort(ordering).isSortedVOf(testCons, ordering))
   assert(testCons.mergeSort(ordering).isSortedVOf(testCons,ordering))
   assert(testCons.quickSort(ordering).isSortedVOf(testCons, ordering))
-  assert(testCons2.zip(testCons3) == (1,5) :: (2,3) :: (5,4) :: RNil)
-  assert(trueList.repeatElems(100000).all(identity))
-  assert(!(trueList.repeatElems(100000) ++ (false :: RNil)).all(identity))
-  val bigList = aLargeList.getRandElemsV2(5000, Some(42))
-  assert(bigList.quickSort(ordering).isSortedVOf(bigList,ordering))
-//  val randomList = aLargeList.getRandElemsV2(10000, Some(100)) // SO
-// val randomList = aLargeList.getRandElemsV2(7000, Some(83)) // RunsForever
-  val randomList = aLargeList.getRandElemsV2(7000, Some(83))
-  val insertTest0 = System.currentTimeMillis()
-  val insertionSortedList = randomList.insertionSort(ordering)
-  val insertTime = System.currentTimeMillis() - insertTest0
-  println(insertTime)
-  val mergeTest0 = System.currentTimeMillis()
-  val mergeSortedList = randomList.mergeSort(ordering)
-  val mergeTime = System.currentTimeMillis() - mergeTest0
-  println(mergeTime)
-  assert(mergeSortedList == insertionSortedList)
-  val testConss = ::(3,RNil)
-  assert(testConss.mergeSort(ordering) == ::(3, RNil))
 
-  val runsForeverList = aLargeList.getRandElemsV2(7000, Some(83))
-  val quickTest0 = System.currentTimeMillis()
-  val quickSortedList = runsForeverList.quickSort(ordering)
-  val quickTime = System.currentTimeMillis() - quickTest0
-  assert(quickSortedList.isSortedVOf(runsForeverList, ordering))
-  println(quickTime)
 
-//  val quickTest2 = System.currentTimeMillis()
-//  val quickSortedList2 = randomList.quickSortV2(ordering)
-//  val quickTime2 = System.currentTimeMillis() - quickTest2
-//  println(quickTime2)
 
-//  val randomList2 = aLargeList.getRandElemsV2(7000, Some(83))
-//  val quickTest3 = System.currentTimeMillis()
-//  val quickSortedList3 = randomList2.quickSortV2(ordering)
-//  val quickTime3 = System.currentTimeMillis() - quickTest3
-//  println(quickTime3)
 }
