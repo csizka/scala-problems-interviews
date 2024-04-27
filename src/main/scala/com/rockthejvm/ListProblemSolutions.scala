@@ -43,6 +43,7 @@ sealed abstract class RList[+T] {
   def mergeSortedLists[S >: T](ordering: Ordering[S], toMergeWith: RList[S]): RList[S]
   def quickSort[S >: T](ordering: Ordering[S]): RList[S]
   def quickSortV2[S >: T](ordering: Ordering[S]): RList[S]
+  def zip[S](other: RList[S]): RList[(T, S)]
 }
 
 case object RNil extends RList[Nothing] {
@@ -72,6 +73,7 @@ case object RNil extends RList[Nothing] {
   override def mergeSortedLists[S >: Nothing](ordering: Ordering[S], toMergeWith: RList[S]): RList[S] = toMergeWith
   override def quickSort[S >: Nothing](ordering: Ordering[S]): RList[S] = RNil
   override def quickSortV2[S >: Nothing](ordering: Ordering[S]): RList[S] = RNil
+  override def zip[S](other: RList[S]): RList[(Nothing, S)] = RNil
 }
 case class ::[+T](override val head: T, override val tail: RList[T]) extends RList[T] {
   override def isEmpty: Boolean = false
@@ -276,16 +278,7 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     @tailrec
     def divider(rest: RList[S], elem: S, smaller: RList[S], bigger: RList[S]): RList[RList[S]] = rest match {
-      case RNil   => bigger match {
-        case RNil => smaller match {
-          case RNil => (elem :: RNil) :: RNil
-          case _    => (elem :: RNil) :: smaller :: RNil
-        }
-        case _    => smaller match {
-          case RNil => bigger :: (elem :: RNil) :: RNil
-          case _    => bigger :: (elem :: RNil) :: smaller :: RNil
-        }
-      }
+      case RNil   => (bigger :: (elem :: RNil) :: smaller :: RNil).filter(!_.isEmpty)
       case ::(head, tail) =>
         if (ordering.gt(head, elem)) divider(tail, elem, smaller, head :: bigger)
         else divider(tail, elem, head :: smaller, bigger)
@@ -332,6 +325,15 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
       }
     }
     sortHelper(divider(tail, head, RNil, head :: RNil, RNil), RNil)
+  }
+
+  override def zip[S](other: RList[S]): RList[(T, S)] = {
+    @tailrec
+    def zipHelper(lhs: RList[T], rhs: RList[S], acc: RList[(T,S)]): RList[(T,S)] = (lhs, rhs) match {
+      case (::(lhsHead, lhsTail), ::(rhsHead, rhsTail) ) => zipHelper(lhsTail, rhsTail, (lhsHead, rhsHead) :: acc)
+      case _ => acc.reverse
+    }
+    zipHelper(this, other, RNil)
   }
 }
  object RList {
@@ -409,6 +411,7 @@ object ListProblemSolutions extends App {
   assert(testCons2.insertionSort(ordering) == 1 :: 2 :: 3 :: 4 :: 5 :: RNil)
   assert(testCons.insertionSort(ordering) == testCons.mergeSort(ordering))
   assert(testCons.mergeSort(ordering) == testCons.insertionSort(ordering))
+  assert(testCons2.zip(testCons3) == (1,5) :: (2,3) :: (5,4) :: RNil)
 //  val randomList = aLargeList.getRandElemsV2(10000, Some(100)) // SO
 // val randomList = aLargeList.getRandElemsV2(7000, Some(83)) // RunsForever
   val randomList = aLargeList.getRandElemsV2(5000, Some(42))
@@ -427,9 +430,13 @@ object ListProblemSolutions extends App {
   val quickSortedList = randomList.quickSort(ordering)
   val quickTime = System.currentTimeMillis() - quickTest0
   println(quickTime)
-  val quickTest2 = System.currentTimeMillis()
-  val quickSortedList2 = randomList.quickSortV2(ordering)
-  val quickTime2 = System.currentTimeMillis() - quickTest2
-  println(quickTime2)
-
+//  val quickTest2 = System.currentTimeMillis()
+//  val quickSortedList2 = randomList.quickSortV2(ordering)
+//  val quickTime2 = System.currentTimeMillis() - quickTest2
+//  println(quickTime2)
+  val randomList2 = aLargeList.getRandElemsV2(7000, Some(83))
+  val quickTest3 = System.currentTimeMillis()
+  val quickSortedList3 = randomList2.quickSortV2(ordering)
+  val quickTime3 = System.currentTimeMillis() - quickTest3
+  println(quickTime3)
 }
