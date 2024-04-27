@@ -47,6 +47,7 @@ sealed abstract class RList[+T] {
   def all(pred: T => Boolean): Boolean
   def isSortedVOf[S >: T](list: RList[S], ordering: Ordering[S]): Boolean
   def contains[S >: T](elem: S): Boolean
+  def toList: List[T]
 }
 
 case object RNil extends RList[Nothing] {
@@ -81,6 +82,8 @@ case object RNil extends RList[Nothing] {
   override def isSortedVOf[S >: Nothing](list: RList[S], ordering: Ordering[S]): Boolean = list.isEmpty
 
   override def contains[S >: Nothing](elem: S): Boolean = false
+
+  override def toList: List[Nothing] = List.empty
 }
 case class ::[+T](override val head: T, override val tail: RList[T]) extends RList[T] {
   override def isEmpty: Boolean = false
@@ -340,8 +343,7 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     val sameSize = this.length == list.length
     val zippedSortedList = this.zip(tail)
     val isInOrder = zippedSortedList.all { case (x, y) => ordering.lteq(x, y) }
-    val thisGrouped = this.countGroups
-    val isThisSubsetOfList = list.countGroups.all(thisGrouped.contains(_))
+    val isThisSubsetOfList = list.toList.groupBy(identity) == this.toList.groupBy(identity)
     sameSize && isInOrder && isThisSubsetOfList
   }
 
@@ -354,6 +356,15 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
         else containsHelper(tail)
     }
     containsHelper(this)
+  }
+
+  override def toList: List[T] = {
+    @tailrec
+    def lister(rest: RList[T], acc: List[T]): List[T] = rest match {
+      case RNil => acc.reverse
+      case ::(head, tail) => lister(tail, head :: acc)
+    }
+    lister(this, List.empty)
   }
 }
  object RList {
@@ -375,8 +386,8 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
    }
    @tailrec
    def concatenateReverseFirstList[S](remaining: RList[S], acc: RList[S]): RList[S] = remaining match {
-     case RNil => acc
-     case ::(head, tail) => concatenateReverseFirstList(tail, head :: acc)
+     case RNil            => acc
+     case ::(head, tail)  => concatenateReverseFirstList(tail, head :: acc)
    }
  }
 object ListProblemSolutions extends App {
@@ -431,7 +442,7 @@ object ListProblemSolutions extends App {
   assert(!(trueList.repeatElems(100000) ++ (false :: RNil)).all(identity))
   //Sort Tests
   // val randomList = aLargeList.getRandElemsV2(10000, Some(100)) // SO
-  val randomList = aLargeList.getRandElemsV2(7000, Some(83))
+  val randomList = aLargeList.getRandElemsV2(100000, Some(83))
   val ordering = Ordering.fromLessThan[Int](_ < _)
   val testConss = ::(3, RNil)
   assert(testConss.mergeSort(ordering) == ::(3, RNil))
@@ -442,6 +453,8 @@ object ListProblemSolutions extends App {
     assert(quickSortedList.isSortedVOf(input, ordering))
     println(testTime)
   }
+
+  println("tests starting...")
   measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.quickSort(ordering), ordering)
   measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.mergeSort(ordering), ordering)
   measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.insertionSort(ordering), ordering)
