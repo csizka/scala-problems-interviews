@@ -299,21 +299,11 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
   }
   override def quickSortV2[S >: T](ordering: Ordering[S]): RList[S] = {
     @tailrec
-    def divider(rest:RList[S], elem: S, smaller: RList[S], same: RList[S], bigger: RList[S]): RList[RList[S]] = rest match {
-      case RNil => smaller match {
-        case RNil => bigger match {
-          case RNil => same :: RNil
-          case _    => same :: bigger :: RNil
-        }
-        case _ => bigger match {
-          case RNil => smaller :: same :: RNil
-          case _ => smaller :: same :: bigger :: RNil
-        }
-      }
+    def divider(rest: RList[S], elem: S, smaller: RList[S], bigger: RList[S]): RList[RList[S]] = rest match {
+      case RNil => (smaller :: (elem :: RNil) :: bigger :: RNil).filter(!_.isEmpty)
       case ::(head, tail) =>
-        if (ordering.gt(head, elem)) divider(tail, elem, smaller, same, head :: bigger)
-        else if (ordering.lt(head, elem)) divider(tail, elem, head :: smaller, same, bigger)
-        else divider(tail, elem, smaller, head :: same, bigger)
+        if (ordering.gt(head, elem)) divider(tail, elem, smaller, head :: bigger)
+        else divider(tail, elem, head :: smaller, bigger)
     }
     @tailrec
     def sortHelper(rest: RList[RList[S]], sorted: RList[S]): RList[S] = rest match {
@@ -321,10 +311,10 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
       case ::(head, tail) => head match {
         case RNil                 => sortHelper(tail, sorted)
         case ::(fstHead, RNil)    => sortHelper(tail, fstHead :: sorted)
-        case ::(fstHead, fstTail) => sortHelper(divider(fstTail, fstHead, RNil, fstHead :: RNil, RNil) ++ tail, sorted)
+        case ::(fstHead, fstTail) => sortHelper(divider(fstTail, fstHead, RNil, RNil) ++ tail, sorted)
       }
     }
-    sortHelper(divider(tail, head, RNil, head :: RNil, RNil), RNil)
+    sortHelper(divider(tail, head, RNil, RNil), RNil)
   }
 
   override def zip[S](other: RList[S]): RList[(T, S)] = {
@@ -455,7 +445,7 @@ object ListProblemSolutions extends App {
   measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.quickSort(ordering), ordering)
   measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.mergeSort(ordering), ordering)
   measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.insertionSort(ordering), ordering)
-//  measueAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.quickSortV2(ordering), ordering)
+  measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.quickSortV2(ordering), ordering)
 
   assert(testCons2.insertionSort(ordering) == 1 :: 2 :: 3 :: 4 :: 5 :: RNil)
   assert(testCons.insertionSort(ordering).isSortedVOf(testCons, ordering))
