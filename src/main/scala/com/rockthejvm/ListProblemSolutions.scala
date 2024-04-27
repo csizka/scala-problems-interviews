@@ -2,8 +2,8 @@ package com.rockthejvm
 
 import com.rockthejvm.RList.concatenateReverseFirstList
 
-import java.lang.System.currentTimeMillis
 import scala.annotation.tailrec
+import scala.language.postfixOps
 import scala.util.Random
 
 sealed abstract class RList[+T] {
@@ -22,7 +22,7 @@ sealed abstract class RList[+T] {
   def flatMap[S](f: T => RList[S]): RList[S]
   def flatMapV2[S](f: T => RList[S]): RList[S]
   def filter(f: T => Boolean): RList[T]
-  def runLengthEncodingNonConseq: RList[(T, Int)]
+  def countGroups: RList[(T, Int)]
   def runLengthEncodingConseq: RList[(T, Int)]
   def repeatElems(n: Int): RList[T]
   def shiftLeft(n: Int): RList[T]
@@ -44,6 +44,9 @@ sealed abstract class RList[+T] {
   def quickSort[S >: T](ordering: Ordering[S]): RList[S]
   def quickSortV2[S >: T](ordering: Ordering[S]): RList[S]
   def zip[S](other: RList[S]): RList[(T, S)]
+  def all(pred: T => Boolean): Boolean
+  def isSortedVOf[S >: T](list: RList[S], ordering: Ordering[S]): Boolean
+  def contains[S >: T](elem: S): Boolean
 }
 
 case object RNil extends RList[Nothing] {
@@ -62,7 +65,7 @@ case object RNil extends RList[Nothing] {
   override def flatMap[S](f: Nothing => RList[S]): RList[S] = RNil
   override def flatMapV2[S](f: Nothing => RList[S]): RList[S] = RNil
   override def filter(f: Nothing => Boolean): RList[Nothing] = RNil
-  override def runLengthEncodingNonConseq: RList[(Nothing, Int)] = RNil
+  override def countGroups: RList[(Nothing, Int)] = RNil
   override def runLengthEncodingConseq: RList[(Nothing, Int)] = RNil
   override def repeatElems(n: Int): RList[Nothing] = RNil
   override def shiftLeft(n: Int): RList[Nothing] = RNil
@@ -74,6 +77,10 @@ case object RNil extends RList[Nothing] {
   override def quickSort[S >: Nothing](ordering: Ordering[S]): RList[S] = RNil
   override def quickSortV2[S >: Nothing](ordering: Ordering[S]): RList[S] = RNil
   override def zip[S](other: RList[S]): RList[(Nothing, S)] = RNil
+  override def all(pred: Nothing => Boolean): Boolean = true
+  override def isSortedVOf[S >: Nothing](list: RList[S], ordering: Ordering[S]): Boolean = list.isEmpty
+
+  override def contains[S >: Nothing](elem: S): Boolean = false
 }
 case class ::[+T](override val head: T, override val tail: RList[T]) extends RList[T] {
   override def isEmpty: Boolean = false
@@ -164,7 +171,7 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     filterHelper(this, RNil)
   }
-  override def runLengthEncodingNonConseq: RList[(T, Int)] = {
+  override def countGroups: RList[(T, Int)] = {
     @tailrec
     def sorter(elem: T, rest: RList[(T, Int)], checked: RList[(T, Int)]): RList[(T, Int)] = rest match {
       case RNil                 =>  (elem, 1) :: checked
@@ -335,6 +342,36 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     zipHelper(this, other, RNil)
   }
+
+  override def all(pred: T => Boolean): Boolean = {
+    @tailrec
+    def allHelper(list: RList[T]): Boolean = list match{
+      case ::(head, tail) =>
+        if (pred(head)) allHelper(tail)
+        else false
+      case RNil => true
+    }
+    allHelper(this)
+  }
+  override def isSortedVOf[S >: T](list: RList[S], ordering: Ordering[S]): Boolean = {
+    val sameSize = this.length == list.length
+    val zippedSortedList = this.zip(tail)
+    val isInOrder = zippedSortedList.all { case (x, y) => ordering.lteq(x, y) }
+    val thisGrouped = this.countGroups
+    val isThisSubsetOfList = list.countGroups.all(thisGrouped.contains(_))
+    sameSize && isInOrder && isThisSubsetOfList
+  }
+
+  override def contains[S >: T](elem: S): Boolean = {
+    @tailrec
+    def containsHelper(rest: RList[S]): Boolean = rest match {
+      case RNil => false
+      case ::(head, tail) =>
+        if (head == elem) true
+        else containsHelper(tail)
+    }
+    containsHelper(this)
+  }
 }
  object RList {
    def from[T](iterable: Iterable[T]): RList[T] = {
@@ -371,6 +408,7 @@ object ListProblemSolutions extends App {
     x =>
       if (x % 2 == 0) x :: x :: x :: RNil
       else x :: 2 * x :: RNil}
+  val trueList = true :: RNil
   assert(testCons.tail.::(testCons2.head).toString == "[1,2,5,3,4]")
   assert(testCons.apply(1) == 2)
   assert(testCons.apply(0) == 1)
@@ -398,7 +436,7 @@ object ListProblemSolutions extends App {
   val secondTime = System.currentTimeMillis()
   aLargeList.flatMapV2(x => x :: 2 * x :: RNil)
   val flatMapV2Time = System.currentTimeMillis() - secondTime
-  assert(testCons5.runLengthEncodingNonConseq == (4,2) :: (2,4) :: (1,4) :: (3,2) :: (5,2) :: RNil)
+  assert(testCons5.countGroups == (4,2) :: (2,4) :: (1,4) :: (3,2) :: (5,2) :: RNil)
   assert(testCons6.runLengthEncodingConseq == (1,1) :: (2,4) :: (5,1) :: (10,1) :: (3,1) :: (6,1) :: (4,3) :: RNil)
   assert(testCons3.repeatElems(3) == 5 :: 5 :: 5 :: 3 :: 3 :: 3 :: 4 :: 4 :: 4 :: RNil)
   assert(testCons.shiftLeft(2) ==  5 :: 3 :: 4 :: 1 :: 2 :: RNil)
@@ -409,9 +447,14 @@ object ListProblemSolutions extends App {
 //  println(testCons2.getRandElemsV2(7))
   val ordering = Ordering.fromLessThan[Int](_ < _)
   assert(testCons2.insertionSort(ordering) == 1 :: 2 :: 3 :: 4 :: 5 :: RNil)
-  assert(testCons.insertionSort(ordering) == testCons.mergeSort(ordering))
-  assert(testCons.mergeSort(ordering) == testCons.insertionSort(ordering))
+  assert(testCons.insertionSort(ordering).isSortedVOf(testCons, ordering))
+  assert(testCons.mergeSort(ordering).isSortedVOf(testCons,ordering))
+  assert(testCons.quickSort(ordering).isSortedVOf(testCons, ordering))
   assert(testCons2.zip(testCons3) == (1,5) :: (2,3) :: (5,4) :: RNil)
+  assert(trueList.repeatElems(100000).all(identity))
+  assert(!(trueList.repeatElems(100000) ++ (false :: RNil)).all(identity))
+  val bigList = aLargeList.getRandElemsV2(5000, Some(42))
+  assert(bigList.quickSort(ordering).isSortedVOf(bigList,ordering))
 //  val randomList = aLargeList.getRandElemsV2(10000, Some(100)) // SO
 // val randomList = aLargeList.getRandElemsV2(7000, Some(83)) // RunsForever
   val randomList = aLargeList.getRandElemsV2(5000, Some(42))
@@ -434,9 +477,9 @@ object ListProblemSolutions extends App {
 //  val quickSortedList2 = randomList.quickSortV2(ordering)
 //  val quickTime2 = System.currentTimeMillis() - quickTest2
 //  println(quickTime2)
-  val randomList2 = aLargeList.getRandElemsV2(7000, Some(83))
-  val quickTest3 = System.currentTimeMillis()
-  val quickSortedList3 = randomList2.quickSortV2(ordering)
-  val quickTime3 = System.currentTimeMillis() - quickTest3
-  println(quickTime3)
+//  val randomList2 = aLargeList.getRandElemsV2(7000, Some(83))
+//  val quickTest3 = System.currentTimeMillis()
+//  val quickSortedList3 = randomList2.quickSortV2(ordering)
+//  val quickTime3 = System.currentTimeMillis() - quickTest3
+//  println(quickTime3)
 }
