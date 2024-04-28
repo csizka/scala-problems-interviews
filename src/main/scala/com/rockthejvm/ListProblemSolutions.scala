@@ -48,6 +48,9 @@ sealed abstract class RList[+T] {
   def isSortedVOf[S >: T](list: RList[S], ordering: Ordering[S]): Boolean
   def contains[S >: T](elem: S): Boolean
   def toList: List[T]
+  def foldLeft[S](startElem: S)(f: (T, S) => S): S
+  def take(n: Int): RList[T]
+  def drop(n: Int): RList[T]
 }
 
 case object RNil extends RList[Nothing] {
@@ -80,10 +83,11 @@ case object RNil extends RList[Nothing] {
   override def zip[S](other: RList[S]): RList[(Nothing, S)] = RNil
   override def all(pred: Nothing => Boolean): Boolean = true
   override def isSortedVOf[S >: Nothing](list: RList[S], ordering: Ordering[S]): Boolean = list.isEmpty
-
   override def contains[S >: Nothing](elem: S): Boolean = false
-
   override def toList: List[Nothing] = List.empty
+  override def foldLeft[S](startElem: S)(f: (Nothing, S) => S): S = startElem
+  override def take(n: Int): RList[Nothing] = RNil
+  override def drop(n: Int): RList[Nothing] = RNil
 }
 case class ::[+T](override val head: T, override val tail: RList[T]) extends RList[T] {
   override def isEmpty: Boolean = false
@@ -366,6 +370,28 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     lister(this, List.empty)
   }
+  override def foldLeft[S](startElem: S)(f: (T, S) => S): S = {
+    @tailrec
+    def foldLeftHelper(rest: RList[T], acc: S): S = rest match {
+      case RNil => acc
+      case ::(head, tail) => foldLeftHelper(tail, f(head, acc))
+    }
+    foldLeftHelper(this, startElem)
+  }
+  override def take(n: Int): RList[T] = {
+    @tailrec
+    def takehelper(rest:RList[T], index: Int, acc: RList[T]): RList[T] = {
+      if (index <= 0 || rest.isEmpty) acc.reverse
+      else takehelper(rest.tail, index - 1, rest.head :: acc)
+    }
+  takehelper(this, n, RNil)
+  }
+
+  override def drop(n: Int): RList[T] = {
+    if (this.isEmpty || n <= 0) this
+    else tail.drop(n - 1)
+  }
+
 }
  object RList {
    def from[T](iterable: Iterable[T]): RList[T] = {
@@ -440,6 +466,17 @@ object ListProblemSolutions extends App {
   assert(testCons2.zip(testCons3) == (1,5) :: (2,3) :: (5,4) :: RNil)
   assert(trueList.repeatElems(100000).all(identity))
   assert(!(trueList.repeatElems(100000) ++ (false :: RNil)).all(identity))
+  //  foldLeft tests
+  assert(testCons.foldLeft(0)(_ + _) == 15)
+  assert(testCons.foldLeft(1)((x, y) => x * y) == 2 * 5 * 3 * 4)
+  assert(testCons.foldLeft(RNil: RList[String])((x: Int, y: RList[String]) => ("megnezed??" :: RNil).repeatElems(x) ++ y) == ("megnezed??" :: RNil).repeatElems(15))
+  assert(testCons.foldLeft(0)((x, y) =>
+    if (x > y) x
+    else y) == 5)
+  assert(testCons3.take(6) == testCons3)
+  assert(testCons.take(2) == 1 :: 2 :: RNil)
+  assert(testCons3.drop(4) == RNil)
+  assert(testCons3.drop(2) == 4 :: RNil)
   //Sort Tests
   // val randomList = aLargeList.getRandElemsV2(10000, Some(100)) // SO
   val randomList = aLargeList.getRandElemsV2(100000, Some(83))
@@ -457,14 +494,14 @@ object ListProblemSolutions extends App {
   println("tests starting...")
   measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.quickSort(ordering), ordering)
   measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.mergeSort(ordering), ordering)
-  measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.insertionSort(ordering), ordering)
   measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.quickSortV2(ordering), ordering)
+  measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.insertionSort(ordering), ordering)
+  println("tests finished.")
 
   assert(testCons2.insertionSort(ordering) == 1 :: 2 :: 3 :: 4 :: 5 :: RNil)
   assert(testCons.insertionSort(ordering).isSortedVOf(testCons, ordering))
   assert(testCons.mergeSort(ordering).isSortedVOf(testCons,ordering))
   assert(testCons.quickSort(ordering).isSortedVOf(testCons, ordering))
-
 
 
 }
