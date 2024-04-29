@@ -49,8 +49,11 @@ sealed abstract class RList[+T] {
   def contains[S >: T](elem: S): Boolean
   def toList: List[T]
   def foldLeft[S](startElem: S)(f: (T, S) => S): S
+  def foldRight[S](startElem: S)(f: (T, S) => S): S
   def take(n: Int): RList[T]
   def drop(n: Int): RList[T]
+  def exists(predicate: T => Boolean): Boolean
+  def find(predicate: T => Boolean): Option[T]
 }
 
 case object RNil extends RList[Nothing] {
@@ -86,8 +89,11 @@ case object RNil extends RList[Nothing] {
   override def contains[S >: Nothing](elem: S): Boolean = false
   override def toList: List[Nothing] = List.empty
   override def foldLeft[S](startElem: S)(f: (Nothing, S) => S): S = startElem
+  override def foldRight[S](startElem: S)(f: (Nothing, S) => S): S = startElem
   override def take(n: Int): RList[Nothing] = RNil
   override def drop(n: Int): RList[Nothing] = RNil
+  override def exists(predicate: Nothing => Boolean): Boolean = false
+  override def find(predicate: Nothing => Boolean): Option[Nothing] = None
 }
 case class ::[+T](override val head: T, override val tail: RList[T]) extends RList[T] {
   override def isEmpty: Boolean = false
@@ -280,7 +286,6 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     msTailRec(this.map( x => x :: RNil), RNil)
   }
-
   override def quickSort[S >: T](ordering: Ordering[S]): RList[S] = {
     val size = this.length
     @tailrec
@@ -323,7 +328,6 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     sortHelper(divider(tail, head, RNil, RNil), RNil)
   }
-
   override def zip[S](other: RList[S]): RList[(T, S)] = {
     @tailrec
     def zipHelper(lhs: RList[T], rhs: RList[S], acc: RList[(T,S)]): RList[(T,S)] = (lhs, rhs) match {
@@ -332,7 +336,6 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     zipHelper(this, other, RNil)
   }
-
   override def all(pred: T => Boolean): Boolean = {
     @tailrec
     def allHelper(list: RList[T]): Boolean = list match{
@@ -350,7 +353,6 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     val isThisSubsetOfList = list.toList.groupBy(identity) == this.toList.groupBy(identity)
     sameSize && isInOrder && isThisSubsetOfList
   }
-
   override def contains[S >: T](elem: S): Boolean = {
     @tailrec
     def containsHelper(rest: RList[S]): Boolean = rest match {
@@ -361,7 +363,6 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     containsHelper(this)
   }
-
   override def toList: List[T] = {
     @tailrec
     def lister(rest: RList[T], acc: List[T]): List[T] = rest match {
@@ -370,6 +371,7 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     lister(this, List.empty)
   }
+//  f(f(f(f(start, 1), 2), 3), 4)
   override def foldLeft[S](startElem: S)(f: (T, S) => S): S = {
     @tailrec
     def foldLeftHelper(rest: RList[T], acc: S): S = rest match {
@@ -378,6 +380,12 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
     foldLeftHelper(this, startElem)
   }
+
+//    f(1, f(2, f(3, f(4, start))))
+  override def foldRight[S](startElem: S)(f: (T, S) => S): S = {
+    f(head,tail.foldRight(startElem)(f))
+  }
+
   override def take(n: Int): RList[T] = {
     @tailrec
     def takehelper(rest:RList[T], index: Int, acc: RList[T]): RList[T] = {
@@ -386,10 +394,31 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
     }
   takehelper(this, n, RNil)
   }
-
   override def drop(n: Int): RList[T] = {
     if (this.isEmpty || n <= 0) this
     else tail.drop(n - 1)
+  }
+
+  override def exists(predicate: T => Boolean): Boolean = {
+  @tailrec
+  def existsHelper(rest: RList[T]): Boolean = rest match {
+    case RNil => false
+    case ::(head, tail) =>
+      if (predicate(head)) true
+      else existsHelper(tail)
+  }
+  existsHelper(this)
+  }
+
+  override def find(predicate: T => Boolean): Option[T] = {
+    @tailrec
+    def findHelper(rest: RList[T]): Option[T]  = rest match {
+      case RNil => None
+      case ::(head, tail) =>
+        if (predicate(head)) Some(head)
+        else findHelper(tail)
+    }
+    findHelper(this)
   }
 
 }
@@ -415,6 +444,15 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
      case RNil            => acc
      case ::(head, tail)  => concatenateReverseFirstList(tail, head :: acc)
    }
+   def fill[T](repetition: Int)(elem: T): RList[T] = {
+     @tailrec
+     def fillTailRec(acc: RList[T], rep: Int): RList[T] = {
+       if (rep <= 0) acc
+       else fillTailRec(elem :: acc, rep - 1)
+     }
+     fillTailRec(RNil, repetition)
+   }
+
  }
 object ListProblemSolutions extends App {
 
@@ -477,6 +515,13 @@ object ListProblemSolutions extends App {
   assert(testCons.take(2) == 1 :: 2 :: RNil)
   assert(testCons3.drop(4) == RNil)
   assert(testCons3.drop(2) == 4 :: RNil)
+  assert(RList.fill(5)(1) == (1 :: RNil).repeatElems(5))
+  assert(testCons.exists(_ % 2 == 0))
+  assert(!testCons3.reverse.drop(1).exists(_ % 2 == 0))
+  assert(testCons.find(_ % 2 == 0) == Some(2))
+  assert(testCons3.reverse.drop(1).find(_ % 2 == 0) == None)
+
+
   //Sort Tests
   // val randomList = aLargeList.getRandElemsV2(10000, Some(100)) // SO
   val randomList = aLargeList.getRandElemsV2(100000, Some(83))
@@ -490,14 +535,18 @@ object ListProblemSolutions extends App {
     assert(quickSortedList.isSortedVOf(input, ordering))
     println(testTime)
   }
-
-  println("tests starting...")
-  measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.quickSort(ordering), ordering)
-  measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.mergeSort(ordering), ordering)
-  measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.quickSortV2(ordering), ordering)
-  measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.insertionSort(ordering), ordering)
-  println("tests finished.")
-
+  def runSortTests(): Unit ={
+    println("tests starting...")
+    println("Quick Sort V1:")
+    measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.quickSort(ordering), ordering)
+    println("Merge Sort:")
+    measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.mergeSort(ordering), ordering)
+    println("Quick Sort V2:")
+    measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.quickSortV2(ordering), ordering)
+    println("Insertion Sort:")
+    measureAndTestSort(randomList, (xs: RList[Int], ord: Ordering[Int]) => xs.insertionSort(ordering), ordering)
+    println("tests finished.")
+  }
   assert(testCons2.insertionSort(ordering) == 1 :: 2 :: 3 :: 4 :: 5 :: RNil)
   assert(testCons.insertionSort(ordering).isSortedVOf(testCons, ordering))
   assert(testCons.mergeSort(ordering).isSortedVOf(testCons,ordering))
