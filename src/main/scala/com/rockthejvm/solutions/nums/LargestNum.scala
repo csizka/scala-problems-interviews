@@ -13,7 +13,11 @@ object LargestNum extends App {
   def largestNum(numList: List[Int]): String = {
     val listedInts = numList.map(numLister(_, List()))
 
-    def elongate(curList: List[Int], size: Int): List[Int] = {
+    /**
+     * Elongates a list by repeating its elems until reaching the requested size.
+     * example: elongate(List(1,2,3), 7) = List(1,2,3,1,2,3,1,2,3)
+     */
+    def elongate[T](curList: List[T], size: Int): List[T] = {
       val curSize = curList.size
       val repeatTime = {
         if (size % curSize == 0) size / curSize
@@ -21,36 +25,36 @@ object LargestNum extends App {
       }
       List.fill(repeatTime)(curList).flatten
     }
+
     @tailrec
     def isFstBigger(tuples: List[(Int, Int)]): Boolean = tuples match {
-      case Nil => false
-      case head :: rest =>
-        val fstHead = head._1
-        val sndHead = head._2
+      case (fstHead, sndHead) :: rest =>
         if (fstHead == sndHead) isFstBigger(rest)
-        else if (fstHead > sndHead) true
-        else false
+        else fstHead > sndHead
+      case Nil => false
     }
 
-    def zipEqualSize(fst: List[Int], snd: List[Int]): List[(Int, Int)] = {
-      val fstSize = fst.size
-      val sndSize = snd.size
-      val sizeDiff = fstSize - sndSize
-      if (sizeDiff == 0) fst.zip(snd)
-      else if (sizeDiff > 0) fst.zip(elongate(snd,fstSize))
-      else elongate(fst, sndSize).zip(snd)
+    /**
+     * Zips 2 lists together, same as zip, but if one of the lists is shorter,
+     * it repeats its elements until having the same length as the other list.
+     * example: fst = List(1,2,3) snd = List(4,5,6)
+     * return value = List((1,4),(2,5),(3,6))
+     */
+    def zipWRepeatingElems[T, S](lhs: List[T], rhs: List[S]): List[(T, S)] = {
+      val lhsSize = lhs.size
+      val rhsSize = rhs.size
+      val sizeDiff = lhsSize - rhsSize
+      if (sizeDiff == 0) lhs.zip(rhs)
+      else if (sizeDiff > 0) lhs.zip(elongate(rhs,lhsSize))
+      else elongate(lhs, rhsSize).zip(rhs)
     }
-    def fstToStartWith(fst:List[Int], snd: List[Int]): Boolean = {
-      isFstBigger(zipEqualSize(fst, snd))
-    }
-    val ordering = Ordering.fromLessThan(fstToStartWith)
-    @tailrec
-    def makeNum(list: List[Int], acc: Int): Long = list match{
-      case head :: rest => makeNum(rest, acc * 10 + head)
-      case Nil => acc
+
+    val ordering = Ordering.fromLessThan[List[Int]] { (lhs, rhs) =>
+      isFstBigger(zipWRepeatingElems(lhs, rhs))
     }
     listedInts.sorted(ordering).flatten.mkString
   }
+
   def largestNumV2(list: List[Int]): String = {
     implicit val ordering: Ordering[Int] = Ordering.fromLessThan { (a,b) =>
       val aString = a.toString
@@ -65,5 +69,4 @@ object LargestNum extends App {
   assert(List(4, 57, 0, 68,7).map(numLister(_, List.empty)) == List(List(4), List(5, 7), List(0), List(6, 8), List(7)))
   assert(List(0, 836, 1).map(numLister(_, List.empty)) == List(List(0), List(8, 3, 6), List(1)))
   assert(largestNum(List(4, 57, 0, 68, 7, 571, 572)) == "7685757257140")
-  println()
 }

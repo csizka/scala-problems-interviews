@@ -2,7 +2,7 @@ package com.rockthejvm.solutions.nums
 
 import scala.annotation.tailrec
 
-object reverseInteger extends App {
+object ReverseInteger extends App {
 
   def reverseInt(num: Int): Int = {
     @tailrec
