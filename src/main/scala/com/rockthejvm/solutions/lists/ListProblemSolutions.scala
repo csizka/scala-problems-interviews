@@ -1,6 +1,6 @@
-package com.rockthejvm
+package com.rockthejvm.solutions.lists
 
-import com.rockthejvm.RList.concatenateReverseFirstList
+import com.rockthejvm.solutions.lists.RList.concatenateReverseFirstList
 
 import scala.annotation.tailrec
 import scala.language.postfixOps
@@ -50,6 +50,7 @@ sealed abstract class RList[+T] {
   def toList: List[T]
   def foldLeft[S](startElem: S)(f: (T, S) => S): S
   def foldRight[S](startElem: S)(f: (T, S) => S): S
+  def foldRightNonTailRec[S](startElem: S)(f: (T, S) => S): S
   def take(n: Int): RList[T]
   def drop(n: Int): RList[T]
   def exists(predicate: T => Boolean): Boolean
@@ -90,6 +91,7 @@ case object RNil extends RList[Nothing] {
   override def toList: List[Nothing] = List.empty
   override def foldLeft[S](startElem: S)(f: (Nothing, S) => S): S = startElem
   override def foldRight[S](startElem: S)(f: (Nothing, S) => S): S = startElem
+  override def foldRightNonTailRec[S](startElem: S)(f: (Nothing, S) => S): S = startElem
   override def take(n: Int): RList[Nothing] = RNil
   override def drop(n: Int): RList[Nothing] = RNil
   override def exists(predicate: Nothing => Boolean): Boolean = false
@@ -383,9 +385,12 @@ case class ::[+T](override val head: T, override val tail: RList[T]) extends RLi
 
 //    f(1, f(2, f(3, f(4, start))))
   override def foldRight[S](startElem: S)(f: (T, S) => S): S = {
-    f(head,tail.foldRight(startElem)(f))
+    ???
   }
 
+  override def foldRightNonTailRec[S](startElem: S)(f: (T, S) => S): S = {
+    f(head, tail.foldRight(startElem)(f))
+  }
   override def take(n: Int): RList[T] = {
     @tailrec
     def takehelper(rest:RList[T], index: Int, acc: RList[T]): RList[T] = {

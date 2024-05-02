@@ -72,7 +72,7 @@ object NumberOps {
 
 object NumberProblems extends App {
 
-  import NumberOps._
+  import com.rockthejvm.solutions.nums.NumberOps._
   // implicit class RRichInt is available here
 
 
