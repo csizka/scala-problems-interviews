@@ -12,7 +12,7 @@ object CountChars extends App {
         val curChar = string.charAt(0)
         val charCount = acc.getOrElse(curChar, 0)
         val newElement = (curChar, charCount + 1)
-        charChecker(string.drop(1), acc + ne wElement)
+        charChecker(string.drop(1), acc + newElement)
       }
     }
     charChecker(str, Map())
