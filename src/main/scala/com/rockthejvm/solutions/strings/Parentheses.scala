@@ -16,6 +16,26 @@ object Parentheses extends App{
     }
     validPhHelper(str, (0,0))
   }
+
+  def genAllValidParenths(n: Int): Set[String] = {
+    @tailrec
+    def genHelper(num: Int, acc: Set[String]): Set[String] = {
+      if (num == n) acc
+      else {
+        val curStrings = for {
+          elem <- acc
+          index <- 0 to elem.length
+        } yield {
+          val (before,after) = elem.splitAt(index)
+          before + "()" + after
+        }
+        genHelper(num + 1, curStrings)
+      }
+    }
+    if (n <=0) Set{"Pls add a valid num."}
+    genHelper(1, Set("()"))
+  }
+
   val goodTst1 = "()"
   val goodTst2 = "()()()"
   val goodTst3 = "((())())"
@@ -34,6 +54,12 @@ object Parentheses extends App{
   assert(!hasValidPatentheses(nGoodTst3))
   assert(!hasValidPatentheses(nGoodTst4))
   assert(!hasValidPatentheses(nGoodTst5))
+
+  assert(genAllValidParenths(1) == Set("()"))
+  assert(genAllValidParenths(2) == Set("(())", "()()"))
+  assert(genAllValidParenths(3) == Set("((()))", "(()())", "()(())", "()()()", "(())()"))
+  assert(genAllValidParenths(4) == Set("(((())))", "()((()))", "(()(()))", "((()()))", "((())())", "((()))()", "()(()())", "(()()())", "(()())()", "()()()()", "()(())()", "(())()()", "()()(())", "(())(())"))
+
 
 }
 
