@@ -10,6 +10,7 @@ sealed abstract class BTree[+T] {
   def collectLeaves: List[BTree[T]]
   def leafCount: Int
   def size: Int
+  def nthLevelNodes(n: Int): List[BTree[T]]
 }
 case object BEnd extends BTree[Nothing] {
   override def isEmpty: Boolean = true
@@ -20,6 +21,7 @@ case object BEnd extends BTree[Nothing] {
   override def collectLeaves: List[BTree[Nothing]] = List()
   override def leafCount: Int = 0
   override val size: Int = 0
+  override def nthLevelNodes(n: Int): List[BTree[Nothing]] = List.empty
 }
 
 case class BNode[+T] (override val value: T, override val left: BTree[T], override val right: BTree[T]) extends BTree[T] {
@@ -37,8 +39,31 @@ case class BNode[+T] (override val value: T, override val left: BTree[T], overri
     collectHelper(List(this), List.empty)
   }
   override def leafCount: Int = this.collectLeaves.length
-
   override val size: Int = left.size + right.size + 1
+
+  override def nthLevelNodes(n: Int): List[BTree[T]] = {
+    @tailrec
+    def nthLevelHelper(curlevel: Int, curNodes: List[BTree[T]]): List[BTree[T]] = {
+      if (curNodes.isEmpty) List()
+      else if (curlevel == n) curNodes
+      else nthLevelHelper(curlevel + 1, curNodes.flatMap{
+        case BNode(value, left, right) => List(left, right).filter(!_.isEmpty)})
+    }
+    @tailrec
+    def nthLevelTailrec(curlevel: Int, curNodes: List[BTree[T]]): List[BTree[T]] = {
+      if (curNodes.isEmpty) List()
+      else if (curlevel == n) curNodes
+      else {
+        val nextNodes = for {
+          node <- curNodes
+          child <- List(node.left, node.right) if !child.isEmpty
+        } yield child
+        nthLevelTailrec(curlevel + 1, nextNodes)
+      }
+    }
+    if (n >= 0) nthLevelTailrec(0, List(this))
+    else List()
+  }
 
 }
 object BinaryTreeProblems extends App {
@@ -59,4 +84,5 @@ object BinaryTreeProblems extends App {
   println(testTreeV2.collectLeaves)
   println(testTree.collectLeaves)
   println(testTree.leafCount)
+  println(testTree.nthLevelNodes(2).map(_.value))
 }
