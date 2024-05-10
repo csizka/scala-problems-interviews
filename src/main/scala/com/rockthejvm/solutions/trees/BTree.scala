@@ -1,5 +1,7 @@
 package com.rockthejvm.solutions.trees
 import scala.annotation.tailrec
+import scala.collection.immutable.Queue
+
 
 sealed abstract class BTree[+T] {
   def value: T
@@ -13,6 +15,8 @@ sealed abstract class BTree[+T] {
   def nthLevelNodes(n: Int): List[BTree[T]]
   def mirrorNodes: BTree[T]
   def isSameStructureAs[S >: T](otherTree: BTree[S]): Boolean
+  def isSymmetrical: Boolean
+  def toList: List[T]
 }
 case object BEnd extends BTree[Nothing] {
   override def isEmpty: Boolean = true
@@ -26,6 +30,9 @@ case object BEnd extends BTree[Nothing] {
   override def nthLevelNodes(n: Int): List[BTree[Nothing]] = List.empty
   override def mirrorNodes: BTree[Nothing] = BEnd
   override def isSameStructureAs[S >: Nothing](otherTree: BTree[S]): Boolean = otherTree == BEnd
+  override def isSymmetrical: Boolean = true
+
+  override def toList: List[Nothing] = List()
 }
 
 case class BNode[+T] (override val value: T, override val left: BTree[T], override val right: BTree[T]) extends BTree[T] {
@@ -103,6 +110,67 @@ case class BNode[+T] (override val value: T, override val left: BTree[T], overri
     else false
   }
 
+  override def isSymmetrical: Boolean = this.isSameStructureAs(this.mirrorNodes)
+
+  override def toList: List[T] = {
+    @tailrec
+    def toListHelperPerLevel(rest: List[BTree[T]], acc: List[T]): List[T] = rest match {
+      case Nil => acc
+      case curTrees =>
+        val curValues = curTrees.map(_.value)
+        val nextNodes = curTrees.flatMap { case BNode(value, left, right) => List(left, right) }.filter(!_.isEmpty)
+        toListHelperPerLevel(nextNodes, acc ++ curValues)
+    }
+
+    @tailrec
+    def toListHelperPerLevelV2(rest: List[BTree[T]], acc: List[T]): List[T] = {
+      if (rest.isEmpty) acc
+      else {
+        val curNodes = for {
+          node <- rest
+          child <- List(node.left, node.right) if !child.isEmpty
+        } yield child
+        toListHelperPerLevelV2(curNodes, acc ++ curNodes.map(_.value))
+      }
+    }
+
+    @tailrec
+    def toListHelperPreOrder(rest: List[BTree[T]], acc: Queue[T]): List[T] = rest match {
+      case BNode(value, left, right) :: restTrees => toListHelperPreOrder(left :: right :: restTrees, acc :+ value)
+      case BEnd :: restTrees => toListHelperPreOrder(restTrees, acc)
+      case Nil => acc.toList
+    }
+
+    @tailrec
+    def toListHelperInOrder(toDo: List[BTree[T]], opened: Set[BTree[T]], acc: Queue[T]): List[T] = {
+      if (toDo.isEmpty) acc.toList
+      else {
+        val curTree = toDo.head
+        if (curTree.isEmpty) toListHelperInOrder(toDo.tail, opened, acc)
+        else if (curTree.isLeaf || opened.contains(curTree)) toListHelperInOrder(toDo.tail, opened, acc :+ curTree.value)
+        else toListHelperInOrder(curTree.left :: curTree :: curTree.right :: toDo.tail, opened + curTree, acc)
+      }
+    }
+
+    @tailrec
+    def toListHelperPostOrder(toDo: List[BTree[T]], opened: Set[BTree[T]], acc: Queue[T]): List[T] = {
+      if (toDo.isEmpty) acc.toList
+      else {
+        val curTree = toDo.head
+        if (curTree.isEmpty) toListHelperPostOrder(toDo.tail, opened, acc)
+        else if (curTree.isLeaf || opened.contains(curTree)) toListHelperPostOrder(toDo.tail, opened, acc :+ curTree.value)
+        else toListHelperPostOrder(curTree.left :: curTree.right :: toDo, opened + curTree, acc)
+      }
+    }
+    println(toListHelperPerLevel(List(this), List.empty))
+    println(toListHelperPerLevelV2(List(this), List(value)))
+    println(toListHelperPreOrder(List(this), Queue.empty))
+    println(toListHelperInOrder(List(this), Set.empty,  Queue.empty))
+    println(toListHelperPostOrder(List(this), Set.empty, Queue.empty))
+
+    toListHelperPerLevelV2(List(this), List.empty)
+  }
+
 }
 object BinaryTreeProblems extends App {
   val testTree = BNode(1,
@@ -159,4 +227,5 @@ object BinaryTreeProblems extends App {
   assert(testTree.isSameStructureAs(testTreeSameShape))
   assert(!testTree.isSameStructureAs(testTreeNonSameShape1))
   assert(!testTree.isSameStructureAs(testTreeNonSameShape2))
+  testTree.toList
 }
