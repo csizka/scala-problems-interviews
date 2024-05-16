@@ -6,7 +6,7 @@ object GraphProblems extends App {
   type Graph[T] = Map[T, Set[T]]
 
   val socialNetwork: Graph[String] = Map(
-    "Alice" -> Set("Bob", "Charlie", "David"),
+    "Alice" -> Set("Bob", "Charlie", "David", "Lulu"),
     "Bob" -> Set(),
     "Charlie" -> Set("David"),
     "David" -> Set("Mary", "Bob"),
@@ -20,11 +20,12 @@ object GraphProblems extends App {
   def inDegreeV2[T](graph: Graph[T], node: T): Int = graph.values.count(_.contains(node))
 
   def isPath[T](graph: Graph[T], start: T, target: T): Boolean = {
+    val keyset = graph.keySet
     @tailrec
     def findPathTailRec(curLevel: Set[T], visited: Set[T]): Boolean =
       if (curLevel.contains(target)) true
       else {
-        val nextLevel = curLevel.flatMap(graph(_)) -- visited
+        val nextLevel = (curLevel.flatMap(graph(_)) -- visited) & keyset
         if (nextLevel.isEmpty) false
         else findPathTailRec(nextLevel, visited ++ nextLevel)
       }
@@ -32,17 +33,20 @@ object GraphProblems extends App {
   }
 
   def findPath[T](graph: Graph[T], start: T, target: T): List[T] = {
+    val keySet: Set[T] = graph.keySet
     @tailrec
     def findTailrec(toCheck: List[List[T]], checked: Set[T]): List[T] = {
       if (toCheck.isEmpty) List()
       else if (toCheck.head.head == target) toCheck.head.reverse
-      else if (checked.contains(toCheck.head.head)) findTailrec(toCheck.tail, checked)
+      else if (checked.contains(toCheck.head.head) || !keySet.contains(toCheck.head.head)) findTailrec(toCheck.tail, checked)
       else {
         val newElems = graph(toCheck.head.head) -- checked
         val nextCheckList = newElems.map(nextElem => nextElem :: toCheck.head).toList
         findTailrec(toCheck.tail ++ nextCheckList, checked + toCheck.head.head)
       }
     }
+    val nullSet: Set[T] = Set()
+    val notKeys = graph.foldLeft(nullSet) { case (acc, elem -> set) => set ++ acc} -- keySet
     @tailrec
     def findPathTailrecV2(toCheck: List[List[T]], checked: Set[T]): List[T] = {
       if (toCheck.isEmpty) List()
@@ -50,9 +54,10 @@ object GraphProblems extends App {
         val rightPaths = toCheck.filter(_.head == target)
         if (!rightPaths.isEmpty) rightPaths.head.reverse
         else {
-          val nextLevel = toCheck.flatMap(elemList => graph(elemList.head).filter(!checked.contains(_)).toList.map(_ :: elemList))
-          val newChecked = nextLevel.map(elems => elems.head).toSet ++ checked
-          findPathTailrecV2(nextLevel, newChecked)
+          val filteredPaths = toCheck.filter(list => !checked.contains(list.head)).filter(list => !notKeys.contains(list.head))
+          val nextLevel = filteredPaths.flatMap(elemList => graph(elemList.head).toList.map(_ :: elemList))
+          val nextChecked = toCheck.map(elems => elems.head).toSet ++ checked
+          findPathTailrecV2(nextLevel, nextChecked)
         }
       }
     }
@@ -63,7 +68,7 @@ object GraphProblems extends App {
     @tailrec
     def findTailrec(toCheck: List[List[T]]): List[T] = {
       if (toCheck.isEmpty) List()
-      else if (toCheck.head.isEmpty) findTailrec(toCheck.tail)
+      else if (toCheck.head.isEmpty || !graph.contains(toCheck.head.head)) findTailrec(toCheck.tail)
       else if (toCheck.head.tail.toSet.contains(toCheck.head.head)) {
         val cycleIndex = toCheck.head.tail.indices.filter(toCheck.head.tail(_) == toCheck.head.head).head
         toCheck.head.tail.take(cycleIndex + 1).reverse
@@ -75,7 +80,90 @@ object GraphProblems extends App {
     findTailrec(List(List(node)))
   }
 
-  assert(outDegree(socialNetwork, "Alice") == 3)
+  def makeUndirected[T](graph:Graph[T]): Graph[T] = {
+    @tailrec
+    def unDirectedTailrec(restNodes: List[T], acc: Graph[T]): Graph[T] = {
+      if (restNodes.isEmpty) acc
+      else {
+        val node = restNodes.head
+        val existingFriends = acc(node) & acc.keySet
+        val newFriends = acc(node) &~ existingFriends
+        val newGraph = acc.map{ case (curNode, curSet) =>
+          if (existingFriends.contains(curNode)) curNode -> (acc(curNode) + node)
+          else curNode -> acc(curNode)}
+        if (newFriends.isEmpty) unDirectedTailrec(restNodes.tail, newGraph)
+        else {
+          @tailrec
+          def addNewPplToNetwork(set: Set[T], accumulator: Graph[T]): Graph[T] = {
+            if (set.isEmpty) accumulator
+            else {
+              val newPerson = set.head
+              addNewPplToNetwork(set.tail, accumulator + (newPerson -> Set(node)))
+            }
+          }
+          val finalGraph = addNewPplToNetwork(newFriends, newGraph)
+          unDirectedTailrec(restNodes.tail, finalGraph)
+        }
+      }
+    }
+    val nodeList = graph.keySet.toList
+    unDirectedTailrec(nodeList, graph)
+  }
+
+  def colourGraph[T](graph: Graph[T]): Map[T, Int] = {
+    val correctedGraph = makeUndirected(graph)
+    val keySet = correctedGraph.keySet
+    @tailrec
+    def colourTailrec(rest: Set[T], acc: List[(Int, Set[T])]): Map[T, Int] = {
+      if (rest.isEmpty) acc.flatMap{ case (colour, list) => list.map(elem => (elem, colour))}.toMap
+      else {
+        val head = rest.head
+        val nextRes = {
+          val existingColours = acc.map { case (colour, set) =>
+            if (set.flatMap(elem => correctedGraph(elem)).contains(head)) (colour, set)
+            else (colour, set + head)
+          }
+          if (existingColours != acc) existingColours
+          else acc :+ (acc.size, Set(head))
+        }
+        colourTailrec(rest.tail, nextRes)
+      }
+    }
+    @tailrec
+    def colourTailrecV2(rest: Set[T], acc: List[(Int, Set[T])]): Map[T,Int] = {
+      if (rest.isEmpty) acc.flatMap{ case (int, set) => set.map(elem => (elem, int))}.toMap
+      else {
+        val head = rest.head
+        val headNeighbours = correctedGraph(head)
+        val nextRes = {
+          val indexes = acc.indices.find(index => (acc(index)._2 & headNeighbours).isEmpty)
+          if (!indexes.isEmpty) acc.updated(indexes.get, (indexes.get, acc(indexes.get)._2 + head))
+          else acc :+ (acc.size, Set(head))
+        }
+        colourTailrecV2(rest.tail, nextRes)
+      }
+    }
+
+    @tailrec
+    def colourTailrecV3(rest: Set[T], colour: Int, acc: Map[T, Int]): Map[T,Int] = {
+      if (rest.isEmpty) acc
+      else {
+        val head = rest.head
+        val nextColour = {
+          rest.tail.foldLeft(Map(head -> colour))((intermediateMap, elem) =>
+            if (!intermediateMap.keySet.flatMap(key => correctedGraph(key)).contains(elem))
+              intermediateMap + (elem -> colour)
+            else intermediateMap)
+        }
+            colourTailrecV3(rest -- nextColour.keySet, colour + 1, acc ++ nextColour)
+      }
+    }
+    colourTailrec(keySet, List())
+    colourTailrecV2(keySet, List())
+    colourTailrecV3(keySet, 0, Map.empty)
+  }
+
+  assert(outDegree(socialNetwork, "Alice") == 4)
   assert(outDegree(socialNetwork, "Bob") == 0)
   assert(outDegree(socialNetwork, "David") == 2)
   assert(inDegree(socialNetwork, "Alice") == 0)
@@ -93,4 +181,6 @@ object GraphProblems extends App {
   assert(!findCycle(socialNetwork, "Alice").isEmpty)
   assert(!findCycle(socialNetwork, "David").isEmpty)
   assert(findCycle(socialNetwork, "Bob").isEmpty)
+  println(makeUndirected(socialNetwork))
+  println(colourGraph(socialNetwork))
 }
