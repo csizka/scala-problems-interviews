@@ -1,6 +1,6 @@
 package com.rockthejvm.solutions.graphs
 
-object findTownJudge extends App {
+object FindTownJudge extends App {
 
   def findJudge(n: Int, lst: List[(Int,Int)]): Int = {
     val judge = (1 to n).toList.filter(elem =>
