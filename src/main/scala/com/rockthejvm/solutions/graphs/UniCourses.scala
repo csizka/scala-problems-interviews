@@ -3,63 +3,75 @@ package com.rockthejvm.solutions.graphs
 import scala.annotation.tailrec
 
 object UniCourses extends App {
+  /*
+    nCourses courses at uni, labeled 1 -> n
+    prerequisites = List[(a,b)]
+    (a,b) = b is required in order to take a
 
-  def canTakeAllCourses(nCorses: Int, prereq: List[(Int, Int)]): Boolean = {
-    def prereqMapper(list: List[(Int, Int)]): Map[Int, Set[Int]] = {
-      list.foldLeft((1 to nCorses).flatMap(course => Map(course -> Set[Int]())).toMap){ case (acc, (course, prereq)) => acc + (course -> (acc.getOrElse(course, Set.empty) + prereq)) }
-    }
-    val map = prereqMapper(prereq)
+    Can you take all courses 1 .. n without breaking any prerequisite?
+   */
+
+  def dependencyMapper(nCourses: Int, prereq: List[(Int, Int)]): Map[Int, Set[Int]] = {
+    prereq.foldLeft((1 to nCourses).map(course => (course, Set[Int]())).toMap)
+    { case (acc, (dependant, course)) => acc + (course -> (acc.getOrElse(course, Set()) + dependant)) }
+  }
+  def canTakeAllCourses(nCourses: Int, prereq: List[(Int, Int)]): Boolean = {
+    val coursePrereqs = dependencyMapper(nCourses, prereq)
 
     @tailrec
     def canTakeAllCourses(curMap: Map[Int, Set[Int]]): Boolean = {
-      val nextLevel = curMap.map{ case (course, prereq) => course -> (prereq ++ prereq.flatMap(curPreReq => curMap(curPreReq)))}
-      val impossible = nextLevel.exists(course => course._2.contains(course._1))
+      val nextLevel = curMap.map{ case (course, prereq) => course -> (prereq ++ prereq.flatMap(curPreReq => curMap.getOrElse(curPreReq, Set())))}
+      val impossible = nextLevel.exists{ case (course, prereqs) => prereqs.contains(course)}
       if (impossible) false
       else if (nextLevel == curMap) true
       else canTakeAllCourses(nextLevel)
     }
-    canTakeAllCourses(map)
+    canTakeAllCourses(coursePrereqs)
   }
 
-  def coursesOrder(nCorses: Int, prereq: List[(Int, Int)]): List[Int] = {
-    def prereqMapper(list: List[(Int, Int)]): Map[Int, Set[Int]] = {
-      list.foldLeft((1 to nCorses).flatMap(course => Map(course -> Set[Int]())).toMap){case (acc, (course, prereq)) => acc + (course -> (acc.getOrElse(course, Set.empty) + prereq))}
-    }
-
-    val dependencies = prereqMapper(prereq)
-    val firstCourses = dependencies.flatMap{ case (course, prereq) => if (prereq.isEmpty) List(course) else List() }.toList
-    val restCourses = (1 to nCorses).toSet -- firstCourses
+  //Give one order of the courses that is valid, if there is no valid way, return List()
+  def coursesOrder(nCourses: Int, prereq: List[(Int, Int)]): List[Int] = {
+    val dependencies = dependencyMapper(nCourses, prereq)
 
     @tailrec
-    def orderer(restcourses: Set[Int], acc: List[Int]): List[Int] = {
-      if (restcourses.isEmpty) acc
-      else {
-        val nextLevel = restcourses.filter(course => dependencies(course).subsetOf(acc.toSet))
-        if (!nextLevel.isEmpty) orderer(restcourses -- nextLevel, acc ++ nextLevel.toList)
-        else {
-          List()
+    def ordererTailrec(coursesToOrder: List[Int], orderedCourses: List[Int]): List[Int] = coursesToOrder match {
+      case Nil => orderedCourses
+      case _ =>
+        val (nextOrderedCourses, nextToOrder) = coursesToOrder.foldLeft((orderedCourses, List.empty[Int]))
+        { case ((curOrderedCourses, toOrderInNextIteration), curCourseToConsider) =>
+        val curCourseCanBeAdded = dependencies.getOrElse(curCourseToConsider, Set()).forall(curOrderedCourses.toSet.contains(_))
+          if (curCourseCanBeAdded) (curCourseToConsider :: curOrderedCourses, toOrderInNextIteration)
+          else (curOrderedCourses, curCourseToConsider :: toOrderInNextIteration)
         }
-      }
+        if (nextToOrder.size < coursesToOrder.size)
+        ordererTailrec(nextToOrder, nextOrderedCourses)
+        else List()
     }
-    orderer(restCourses, firstCourses)
+    ordererTailrec((1 to nCourses).toList, List())
   }
 
   def coursesOrderV2(nCourses: Int, prereq: List[(Int, Int)]): List[Int] = {
-    def dependencyMapper(prereq: List[(Int, Int)]): Map[Int,Set[Int]] = {
-      prereq.foldLeft((1 to nCourses).map( course => (course, Set[Int]())).toMap){ case (acc, (dependant, course)) => acc + (course -> (acc.getOrElse(course, Set()) + dependant))}
-    }
-    val dependencies = dependencyMapper(prereq)
+    val dependencies = dependencyMapper(nCourses, prereq)
     @tailrec
-    def courseOrderTailrec(toDo: Set[Int], currentNodes: List[Int], visited: Set[Int], explored: Set[Int], acc: List[Int]): List[Int] = {
-      if (toDo.isEmpty && currentNodes.isEmpty) acc
-      else if (currentNodes.isEmpty && (explored.contains(toDo.head) || visited.contains(toDo.head))) courseOrderTailrec(toDo.tail, List(), visited, explored, acc)
-      else if (currentNodes.isEmpty) courseOrderTailrec(toDo.tail, List(toDo.head), visited, explored, acc)
-      else if (explored.contains(currentNodes.head)) courseOrderTailrec(toDo, currentNodes.tail, visited, explored, acc)
-      else if (dependencies(currentNodes.head).isEmpty || visited.contains(currentNodes.head)) courseOrderTailrec(toDo, currentNodes.tail, visited, explored + currentNodes.head, currentNodes.head :: acc)
-      else {
-        val nextNodes = dependencies(currentNodes.head)
+    def courseOrderTailrec(
+      toDo: Set[Int],
+      currentNodes: List[Int],
+      visited: Set[Int],
+      explored: Set[Int],
+      acc: List[Int]): List[Int] = currentNodes match {
+      case Nil if toDo.isEmpty => acc
+      case Nil if explored.contains(toDo.head) || visited.contains(toDo.head) => {
+        courseOrderTailrec(toDo.tail, List(), visited, explored, acc)
+      }
+      case Nil => courseOrderTailrec(toDo.tail, List(toDo.head), visited, explored, acc)
+      case curNode :: restNodes if explored.contains(curNode) => courseOrderTailrec(toDo, restNodes, visited, explored, acc)
+      case curNode :: restNodes if dependencies.getOrElse(curNode, Set()).isEmpty || visited.contains(curNode) => {
+        courseOrderTailrec (toDo, restNodes, visited, explored + curNode, curNode :: acc)
+      }
+      case curNode :: restNodes => {
+        val nextNodes = dependencies.getOrElse(curNode, Set())
         val cycle = currentNodes.exists(course => nextNodes.contains(course))
-        if (!cycle) courseOrderTailrec(toDo, dependencies(currentNodes.head).toList ++ currentNodes, visited + currentNodes.head, explored, acc)
+        if (!cycle) courseOrderTailrec(toDo, dependencies.getOrElse(curNode, Set()).toList ++ currentNodes, visited + curNode, explored, acc)
         else List()
       }
     }
