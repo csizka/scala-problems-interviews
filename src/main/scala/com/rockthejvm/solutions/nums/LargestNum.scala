@@ -4,6 +4,13 @@ import scala.annotation.tailrec
 
 
 object LargestNum extends App {
+  /*
+        Given a list of non-negative integers, arrange them such that they form the largest number.
+        The result might be huge so return a string.
+
+        List(10, 2) => "210"
+        List(3, 30, 5, 9, 34) => "9534330"
+     */
   @tailrec
   def numLister(num: Int, acc: List[Int]): List[Int] = {
     if (num == 0 && !acc.isEmpty) acc
