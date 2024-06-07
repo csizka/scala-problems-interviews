@@ -7,14 +7,14 @@ object NQueens extends App {
 // Method results in Set of coords not blocked after adding a new queen
   def notBlockedCoords(newQueenCoords: (Int, Int), potentialQueenCoords: Set[(Int, Int)]): Set[(Int, Int)] = {
       val (queenRow, queenCol) = newQueenCoords
-      val newPotCoords = potentialQueenCoords.filterNot { case (rowIx, colIx) =>
+      val newPotentialCoords = potentialQueenCoords.filterNot { case (rowIx, colIx) =>
         val isInSameRow = rowIx == queenRow
         val isInSameCol = colIx == queenCol
         val isInSameDescenDingDiagonal = colIx - rowIx == queenCol - queenRow
         val isInSameAscendingDiagonal = colIx + rowIx == queenCol + queenRow
         isInSameRow || isInSameCol || isInSameAscendingDiagonal || isInSameDescenDingDiagonal
       }
-    newPotCoords
+    newPotentialCoords
   }
 
 // Generates a Board that has an empty queenCoords Set and the coords of an ixCount * ixCount board
@@ -82,8 +82,7 @@ object NQueens extends App {
       else if (restQueens.isEmpty && curRow == boardSize) {
         prettyPrintRecursive(restBoards.tail, restBoards.head, -1, "", boardsAcc + rowsAcc)
       } else if (curRow == -1) prettyPrintRecursive(restBoards, restQueens, 0, top, boardsAcc)
-      // TODO: run debug, and check this condition. run a few iterations and see why the recursion doesn't terminate
-      else if (restQueens.isEmpty || restQueens.head._1 > curRow) {
+       else if (restQueens.isEmpty || restQueens.head._1 > curRow) {
         prettyPrintRecursive(restBoards, restQueens, curRow + 1, rowsAcc + emptyRow, boardsAcc)
       } else {
         val queenColIx = restQueens.head._2
