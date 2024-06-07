@@ -12,7 +12,7 @@ object Eval {
       case Nil          => res
       case head :: rest => head match {
         case Value(value) => buildExprListTailRec(rest, Value(value) :: res)
-        case curExpr      => buildExprListTailRec(curExpr.children ++ rest, curExpr :: res)
+        case curExpr      => buildExprListTailRec(curExpr.children.reverse ++ rest, curExpr :: res)
       }
 
     }
@@ -21,8 +21,8 @@ object Eval {
   def evalExprList(exprList: List[ast.Expr]): Int = {
     // NOTE: mutates the input stack
     def evalOp(evalStack: mutable.Stack[Int], opFn: (Int, Int) => Int): Unit = {
-      val lhs = evalStack.pop()
       val rhs = evalStack.pop()
+      val lhs = evalStack.pop()
       val res = opFn(lhs, rhs)
       evalStack.push(res)
     }
