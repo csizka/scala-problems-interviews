@@ -28,6 +28,16 @@ object Experiments extends App {
 
   object Either {
     def left[L, R](l: L): Either[L, R] = Left(l)
+
+    def map[L, R1, R2](either: Either[L, R1], f: R1 => R2): Either[L, R2] = either match {
+      case Right(x) => Right(f(x))
+      case Left(x) => Left(x)
+    }
+
+    def flatMap[L, R1, R2](either: Either[L, R1], f: R1 => Either[L, R2]): Either[L, R2] = either match {
+      case Right(x) => f(x)
+      case Left(x) => Left(x)
+    }
   }
 
   {
