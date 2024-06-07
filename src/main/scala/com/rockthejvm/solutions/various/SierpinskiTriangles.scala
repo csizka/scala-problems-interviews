@@ -10,7 +10,7 @@ object SierpinskiTriangles extends App {
       if (curLevel == n) acc
       else {
         val spaces = " ".repeat(1 << curLevel)
-        val nextAcc  = acc.map(spaces +  _ + spaces)
+        val nextAcc  = acc.map(spaces + _ + spaces)
         val newTriange = acc.map( row => row + " " + row)
         levelBuildRecur(nextAcc ++ newTriange, curLevel + 1)
         }
