@@ -2,7 +2,8 @@ package com.rockthejvm.solutions.strings
 
 object Anagrams extends App {
 
-  def charCounter(str: String): Map[Char, Int] = str.foldLeft(Map.empty: Map[Char, Int])((map, char: Char) => map + (char -> (map.getOrElse(char, 0)+1)))
+  def charCounter(str: String): Map[Char, Int] =
+    str.foldLeft(Map.empty: Map[Char, Int])((map, char: Char) => map + (char -> (map.getOrElse(char, 0) + 1)))
   def areAnagrams(lhsString: String, rhsString: String): Boolean = {
     val lhsCount = charCounter(lhsString)
     val rhsCount = charCounter(rhsString)
