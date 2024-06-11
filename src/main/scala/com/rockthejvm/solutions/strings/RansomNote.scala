@@ -4,11 +4,10 @@ object RansomNote extends App {
 
   def isRandsomConstructable(note: String, poolText: String): Boolean = {
     def addChar(map: Map[Char, Int], char: Char): Map[Char, Int] =
-    map + (char -> {map.getOrElse(char, 0) + 1})
+      map + (char -> (map.getOrElse(char, 0) + 1))
 
-
-    val noteChars = note.foldLeft(Map.empty: Map[Char, Int])(addChar)
-    val poolChars = poolText.foldLeft(Map.empty: Map[Char, Int])(addChar)
+    val noteChars = note.foldLeft(Map.empty[Char, Int])(addChar)
+    val poolChars = poolText.foldLeft(Map.empty[Char, Int])(addChar)
     noteChars.forall {case (char, count) => poolChars.getOrElse(char, 0) >= count}
   }
 
@@ -18,6 +17,5 @@ object RansomNote extends App {
 
   assert(isRandsomConstructable(testNote, testText))
   assert(!isRandsomConstructable(testNote2, testText))
-
 
 }
