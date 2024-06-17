@@ -1,5 +1,7 @@
 package com.rockthejvm.solutions.various.calculator
 
+import com.rockthejvm.solutions.various.calculator.ast._
+
 object ParserTests extends App {
   assert(Parser.token("asd").eval("asd") == Right(()))
   assert(Parser.token("asd").eval("asd qwe") == Left("Unfinished input: [qwe]"))
@@ -39,11 +41,25 @@ object ParserTests extends App {
   }
 
 
+  {
+    val p1 = Parser.token("case")
+    val p2 = Parser.token("case") andThen Parser.token("class")
+    val p = p1 combine p2
+    println(p.eval("case class"))
+    assert(p.eval("case class") == Right(()))
+  }
 
+  {
+    val p1 = Parser.token("asd")
+    val p2 = Parser.token("qwe")
+    val p = Parser.integer.flatMap(n => if (n % 2 == 0) p1 else p2)
+    assert(p.eval("3 asd") == Left("Expected token 'qwe', got 'asd'"))
+    assert(p.eval("3 qwe") == Right(()))
+  }
 
-  //  {
-//    val p = Parser.token("case") combine Parser.token("case class")
-//    println(p.eval("case class"))
-//    assert(p.eval("case class") == Right(()))
-//  }
+  {
+    assert(Parser.opPlus_desugared.eval("13 + 2") == Right(Add(Value(13), Value(2))))
+    assert(Parser.opPlus.eval("13 + 2") == Right(Add(Value(13), Value(2))))
+    assert(Parser.opPlus.eval("13 - 2") == Left("Expected token '+', got '-'"))
+  }
 }
