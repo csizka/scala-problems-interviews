@@ -114,11 +114,49 @@ object Parser {
       }
     }
 
+  def opParser(operation: Token): Parser[ast.Expr] = {
+    value.flatMap { lhs =>
+      token(operation).flatMap { _ =>
+        value.map { rhs =>
+          operation match {
+            case "+" => ast.Add(lhs, rhs)
+            case "-" => ast.Substract(lhs, rhs)
+            case "*" => ast.Multiply(lhs, rhs)
+            case "/" => ast.Divide(lhs, rhs)
+            case _ => throw new Exception(s"Unexpected input: $operation, please use a vail operation.")
+            }
+          }
+        }
+      }
+    }
+
   val opPlus: Parser[ast.Expr] = for {
     lhs <- value
     _ <- token("+")
     rhs <- value
   } yield ast.Add(lhs, rhs)
+
+  val opMinus: Parser[ast.Expr] = for {
+    lhs <- value
+    _ <- token("-")
+    rhs <- value
+  } yield ast.Substract(lhs, rhs)
+
+  val opMinus_desugared: Parser[ast.Expr] = {
+    value.flatMap { lhs =>
+      token("-").flatMap { _ =>
+        value.map { rhs =>
+          ast.Substract(lhs, rhs)
+        }
+      }
+    }
+  }
+
+  Option(5)
+
+  val opExpr: Parser[ast.Expr] = {
+    opParser("+").combine(opParser("-")).combine(opParser("*")).combine(opParser("/"))
+  }
 
   // TODO: define a parser that can parse any operator (define a helper that can parse an op based on an input param): alternatives + helper
 

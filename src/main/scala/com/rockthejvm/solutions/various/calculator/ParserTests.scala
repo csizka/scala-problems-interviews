@@ -53,6 +53,10 @@ object ParserTests extends App {
     val p1 = Parser.token("asd")
     val p2 = Parser.token("qwe")
     val p = Parser.integer.flatMap(n => if (n % 2 == 0) p1 else p2)
+    val pWithFor = for {
+      num <- Parser.integer
+      _ <- if (num % 2 == 0) p1 else p2
+    } yield ()
     assert(p.eval("3 asd") == Left("Expected token 'qwe', got 'asd'"))
     assert(p.eval("3 qwe") == Right(()))
   }
@@ -62,4 +66,21 @@ object ParserTests extends App {
     assert(Parser.opPlus.eval("13 + 2") == Right(Add(Value(13), Value(2))))
     assert(Parser.opPlus.eval("13 - 2") == Left("Expected token '+', got '-'"))
   }
+
+  {
+    assert(Parser.opMinus_desugared.eval("13 - 2") == Right(Substract(Value(13), Value(2))))
+    assert(Parser.opMinus.eval("13 - 2") == Right(Substract(Value(13), Value(2))))
+    assert(Parser.opMinus.eval("13 + 2") == Left("Expected token '-', got '+'"))
+  }
+
+  {
+    assert(Parser.opExpr.eval("13 + 2") == Right(Add(Value(13), Value(2))))
+    assert(Parser.opExpr.eval("13 - 2") == Right(Substract(Value(13), Value(2))))
+    assert(Parser.opExpr.eval("13 / 2") == Right(Divide(Value(13), Value(2))))
+    assert(Parser.opExpr.eval("13 * 2") == Right(Multiply(Value(13), Value(2))))
+    assert(Parser.opExpr.eval("13 & 2") == Left("Expected token '+', got '&'"))
+  }
+
+
+
 }
