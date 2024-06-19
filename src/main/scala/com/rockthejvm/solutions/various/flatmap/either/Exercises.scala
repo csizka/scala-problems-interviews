@@ -56,17 +56,46 @@ object Exercises {
     theBirth2 -> "Anya"
   )
 
-  // TODO: define + use the newly defined lookup
-  // For a given actor and year, return the list of films they acted in (if it exists, else None)
-  def getFilms(actor: Name, year: Year): Result[List[Title]] = ???
+  // For a given actor and year, return the list of films they acted in (if it exists, else Left)
+  def getFilms(actor: Name, year: Year): Result[List[Title]] =
+    lookup(actors, actor).flatMap(years => lookup(years, year))
 
-  // TODO: define + use toRight on the result of find and give a descriptive custom error message (so that the assertions pass)
+  // Define + use toRight on the result of find and give a descriptive custom error message (so that the assertions pass)
   // For a given actor, director and year, return a film they worked on together (if it exists, else None)
-  def getCommonFilm(actor: Name, director: Name, year: Year): Result[Title] = ???
+  def getCommonFilm(actor: Name, director: Name, year: Year): Result[Title] = {
+    getFilms(actor, year).flatMap { filmography =>
+      filmography
+        .find(films.get(_) == Some(director))
+        .toRight(CustomError(s"No common films were found for actor '$actor' and director '$director' in the year '$year'."))
+    }
+  }
 
-  // TODO: define + use lookup + use toRight on the result of find and give a descriptive custom error message (so that the assertions pass)
-  // For a given actor and film, return the year when the actor acted in the film (if it exists, else None)
-  def getYear(actor: Name, film: Title): Result[Year] = ???
+  def getCommonFilmSugared(actor: Name, director: Name, year: Year): Result[Title] =  for {
+    filmList <- getFilms(actor, year)
+    title <- filmList
+      .find(films.get(_) == Some(director))
+      .toRight(CustomError(s"No common films were found for actor '$actor' and director '$director' in the year '$year'."))
+  } yield title
+
+
+   //Define + use lookup + use toRight on the result of find and give a descriptive custom error message (so that the assertions pass)
+   //For a given actor and film, return the year when the actor acted in the film (if it exists, else None)
+  def getYearDesugared(actor: Name, film: Title): Result[Year] = {
+    lookup(actors, actor).flatMap{ filmography =>
+      filmography
+        .find{ case (year, filmsInYear) => filmsInYear.contains(film) }
+        .toRight(CustomError(s"'$actor' did not act in '$film"))
+        .map { case (year, filmsInYear) => year }
+    }
+  }
+
+  def getYear(actor: Name, film: Title): Result[Year] = for {
+    filmography <- lookup(actors, actor)
+    (year, filmsThatYear) <- filmography.find{ case (year, filmsThatYear) =>
+      filmsThatYear.contains(film)}
+      .toRight(CustomError(s"'$actor' did not act in '$film"))
+  } yield year
+
 }
 
 object ExercisesTests extends App {
@@ -95,10 +124,12 @@ object ExercisesTests extends App {
   // the error message of the first failing subcomputation
 
   assert(getFilms("John", 2000) == Right(List(flatLands, monadsEverywhere)))
+
   shouldFailWithNotFoundError(
     getFilms("John", 2001),
     "2001"
   )
+
   shouldFailWithNotFoundError(
     getFilms("Johny", 2001),
     "Johny"
@@ -107,16 +138,20 @@ object ExercisesTests extends App {
 
 
   assert(getCommonFilm("John", "Huenos Dios", 2000) == Right(flatLands))
+  assert(getCommonFilm("John", "Huenos Dios", 2000) == getCommonFilmSugared("John", "Huenos Dios", 2000))
   assert(getCommonFilm("Terry", "Lukacs Gyorgy", 2003) == Right(startrekWars))
   shouldFailWithCustomError(
     getCommonFilm("Terry", "Huenos Dios", 2003),
-    "No film found where"
+    "No common films were found for actor 'Terry' and director 'Huenos Dios' in the year '2003'."
+  )
+  shouldFailWithCustomError(
+    getCommonFilmSugared("Terry", "Huenos Dios", 2003),
+    "No common films were found for actor 'Terry' and director 'Huenos Dios' in the year '2003'."
   )
   shouldFailWithNotFoundError(
     getCommonFilm("Terrz", "Lukacs Gyorgy", 2003),
     "Terrz"
   )
-
 
   assert(getYear("John", theBirth2) == Right(1996))
   shouldFailWithNotFoundError(
@@ -125,7 +160,7 @@ object ExercisesTests extends App {
   )
   shouldFailWithCustomError(
     getYear("Terry", theBirth2),
-    "did not act in"
+    "'Terry' did not act in 'The Birth II: Monad Messiah"
   )
 }
 
